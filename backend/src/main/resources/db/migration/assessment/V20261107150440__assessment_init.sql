@@ -1,2 +1,2 @@
--- Schema próprio do plugin Assessment. Nenhum outro módulo lê estas tabelas.
+-- Own schema of the Assessment plugin. No other module reads these tables.
 create schema if not exists assessment;

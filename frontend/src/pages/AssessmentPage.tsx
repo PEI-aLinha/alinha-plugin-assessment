@@ -11,7 +11,7 @@ export function AssessmentPage() {
 
   return (
     <>
-      <PageHeader title="Assessment" />
+      <PageHeader title="Avaliação" />
       <p>Backend: {ping.isPending ? 'a verificar…' : ping.isError ? 'indisponível' : ping.data.status}</p>
     </>
   )
