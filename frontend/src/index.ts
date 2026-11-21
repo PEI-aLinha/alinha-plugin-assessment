@@ -1,4 +1,5 @@
 import { definePlugin } from '@alinha/plugin-sdk'
+import { ClipboardCheck } from 'lucide-react'
 import { AssessmentPage } from './pages/AssessmentPage'
 
 /**
@@ -18,6 +19,6 @@ export default definePlugin({
     ],
   },
   nav: [
-    { label: 'Avaliação', path: 'assessment', area: 'client' },
+    { label: 'Avaliação', path: 'assessment', area: 'client', icon: ClipboardCheck, order: 30 },
   ],
 })
