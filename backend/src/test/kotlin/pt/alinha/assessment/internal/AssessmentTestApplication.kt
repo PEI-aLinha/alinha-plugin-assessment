@@ -13,6 +13,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.testcontainers.postgresql.PostgreSQLContainer
 import pt.alinha.assessment.AssessmentPlugin
+import pt.alinha.assessment.internal.web.AssessmentController
+import pt.alinha.assessment.internal.web.AssessmentProblems
 import pt.alinha.core.access.internal.AccessWebConfig
 import pt.alinha.core.access.internal.RequiresPermissionInterceptor
 import pt.alinha.core.access.internal.RolePermissionRegistry
@@ -46,8 +48,7 @@ import pt.alinha.core.tenant.internal.TenantWebConfig
     HibernateTenantResolver::class, CorrelationIdFilter::class, ScopedCorrelationContext::class,
     AuditActor::class, JpaAuditTrail::class,
     CatalogueRegistry::class, ApplicabilityRules::class,
-    // AssessmentService, AssessmentController and AssessmentProblems are added in Task 6, once they exist.
-    AssessmentPlugin::class,
+    AssessmentPlugin::class, AssessmentService::class, AssessmentController::class, AssessmentProblems::class,
 )
 class AssessmentTestApplication {
     @Bean
