@@ -1,0 +1,65 @@
+# Test catalogue (assessment#2). v1 plus CTRL-D: a newer version for the pinned-version tests.
+framework: nis2-qnrcs
+version: 2
+title: "NIS2 test catalogue v2"
+sources:
+  - "Test source"
+
+requirements:
+  - id: REQ-1
+    reference: "Test reference 1"
+    text: "Test requirement."
+    controls: [CTRL-A, CTRL-B, CTRL-C, CTRL-D]
+
+controls:
+  - id: CTRL-A
+    title: "Basic control"
+    level: basic
+    technical: false
+    evidence:
+      - "Evidence A."
+    questions:
+      - id: CTRL-A-Q1
+        text: "Question A?"
+        explanation: "Why A matters."
+        example: "Example A."
+        answers: ["yes", "partial", "no", "unknown"]
+
+  - id: CTRL-B
+    title: "Substantial control"
+    level: substantial
+    technical: false
+    evidence:
+      - "Evidence B."
+    questions:
+      - id: CTRL-B-Q1
+        text: "Question B?"
+        explanation: "Why B matters."
+        example: "Example B."
+        answers: ["yes", "partial", "no", "unknown"]
+
+  - id: CTRL-C
+    title: "High technical control"
+    level: high
+    technical: true
+    evidence:
+      - "Evidence C."
+    questions:
+      - id: CTRL-C-Q1
+        text: "Question C?"
+        explanation: "Why C matters."
+        example: "Example C."
+        answers: ["yes", "no"]
+
+  - id: CTRL-D
+    title: "New basic control"
+    level: basic
+    technical: false
+    evidence:
+      - "Evidence D."
+    questions:
+      - id: CTRL-D-Q1
+        text: "Question D?"
+        explanation: "Why D matters."
+        example: "Example D."
+        answers: ["yes", "partial", "no", "unknown"]

@@ -1,0 +1,39 @@
+# Test catalogue (assessment#2). A second framework, with a basic and a high control.
+framework: gdpr
+version: 1
+title: "GDPR test catalogue v1"
+sources:
+  - "Test source"
+
+requirements:
+  - id: REQ-G
+    reference: "Test reference G"
+    text: "Test requirement."
+    controls: [CTRL-G, CTRL-GH]
+
+controls:
+  - id: CTRL-G
+    title: "GDPR basic control"
+    level: basic
+    technical: false
+    evidence:
+      - "Evidence G."
+    questions:
+      - id: CTRL-G-Q1
+        text: "Question G?"
+        explanation: "Why G matters."
+        example: "Example G."
+        answers: ["yes", "partial", "no", "unknown"]
+
+  - id: CTRL-GH
+    title: "GDPR high control"
+    level: high
+    technical: false
+    evidence:
+      - "Evidence GH."
+    questions:
+      - id: CTRL-GH-Q1
+        text: "Question GH?"
+        explanation: "Why GH matters."
+        example: "Example GH."
+        answers: ["yes", "partial", "no", "unknown"]
