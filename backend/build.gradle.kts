@@ -25,4 +25,5 @@ dependencies {
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
     testRuntimeOnly(libs.flyway.postgresql)
+    testRuntimeOnly(libs.postgresql) // JDBC driver for the Testcontainers database
 }
