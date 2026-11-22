@@ -1,18 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import { useHost } from '@alinha/plugin-sdk'
-import { PageHeader } from '@alinha/ui'
+import { ClipboardCheck } from 'lucide-react'
+import { EmptyState, PageHeader } from '@alinha/ui'
 
 export function AssessmentPage() {
-  const { api } = useHost()
-  const ping = useQuery({
-    queryKey: ['assessment', 'ping'],
-    queryFn: () => api<{ plugin: string; status: string }>('/assessment/ping'),
-  })
-
   return (
     <>
-      <PageHeader title="Avaliação" />
-      <p>Backend: {ping.isPending ? 'a verificar…' : ping.isError ? 'indisponível' : ping.data.status}</p>
+      <PageHeader title="Avaliação" subtitle="Questionário de maturidade em cibersegurança." />
+      <EmptyState icon={<ClipboardCheck className="size-5" aria-hidden />} title="Em construção">
+        Aqui vai poder responder ao questionário sobre as práticas de segurança da sua organização e ver o que já cumpre e o que falta.
+      </EmptyState>
     </>
   )
 }
