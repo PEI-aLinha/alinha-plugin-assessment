@@ -5,11 +5,14 @@ import org.springframework.http.ProblemDetail
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import pt.alinha.assessment.internal.AnswerNotOfferedException
 import pt.alinha.assessment.internal.AssessmentAlreadyOpenException
+import pt.alinha.assessment.internal.AssessmentNotEditableException
 import pt.alinha.assessment.internal.AssessmentNotFoundException
 import pt.alinha.assessment.internal.CatalogueNotFoundException
 import pt.alinha.assessment.internal.FrameworkNotInScopeException
 import pt.alinha.assessment.internal.InvalidFrameworkException
+import pt.alinha.assessment.internal.QuestionNotInAssessmentException
 import tools.jackson.core.JacksonException
 
 private const val VALIDATION_FAILED = "VALIDATION_FAILED"
@@ -58,6 +61,22 @@ class AssessmentProblems {
     @ExceptionHandler
     fun notFound(e: AssessmentNotFoundException) =
         problem(HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND", "Esta avaliação não existe.")
+
+    @ExceptionHandler
+    fun questionNotInAssessment(e: QuestionNotInAssessmentException) =
+        problem(HttpStatus.NOT_FOUND, "QUESTION_NOT_IN_ASSESSMENT", "Esta pergunta não faz parte desta avaliação.")
+
+    @ExceptionHandler
+    fun answerNotOffered(e: AnswerNotOfferedException) =
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, VALIDATION_FAILED, FIX_DATA).apply {
+            setProperty("errors", listOf(error("answer", "Esta resposta não é uma das opções desta pergunta.")))
+        }
+
+    @ExceptionHandler
+    fun notEditable(e: AssessmentNotEditableException) = problem(
+        HttpStatus.CONFLICT, "ASSESSMENT_NOT_EDITABLE",
+        "Esta avaliação já foi entregue e as respostas já não podem ser alteradas.",
+    )
 
     private fun problem(status: HttpStatus, code: String, detail: String) =
         ProblemDetail.forStatusAndDetail(status, detail).apply { setProperty("code", code) }

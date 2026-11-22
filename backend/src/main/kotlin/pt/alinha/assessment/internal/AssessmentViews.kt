@@ -44,6 +44,20 @@ data class AssessmentDetail(
     val controls: List<ControlView>,
 )
 
+data class AssessmentSummary(
+    val id: UUID,
+    val framework: String,
+    val catalogueVersion: Int,
+    val status: String,
+    val progress: ProgressView,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+)
+
+data class AssessmentPage(val items: List<AssessmentSummary>, val page: Int, val pageSize: Int, val total: Long)
+
+data class SavedAnswer(val questionId: String, val answer: Answer, val answeredAt: Instant, val progress: ProgressView)
+
 /** `draft`, `submitted`, ... as in the contract's AssessmentStatus. */
 internal fun AssessmentStatus.apiValue(): String = name.lowercase()
 

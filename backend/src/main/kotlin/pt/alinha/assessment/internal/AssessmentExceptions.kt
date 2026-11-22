@@ -1,5 +1,7 @@
 package pt.alinha.assessment.internal
 
+import pt.alinha.assessment.internal.domain.AssessmentStatus
+import pt.alinha.core.compliance.Answer
 import java.util.UUID
 
 /** The applicability rules say this framework does not apply to the organization. */
@@ -24,3 +26,19 @@ class AssessmentAlreadyOpenException(
 
 /** No such assessment in the current organization (also for another organization's id). */
 class AssessmentNotFoundException : RuntimeException("Assessment not found")
+
+/** The question exists in some catalogue but not in this assessment (above its level, or another framework). */
+class QuestionNotInAssessmentException(
+    val questionId: String,
+) : RuntimeException("Question $questionId is not part of this assessment")
+
+/** A valid answer value that this question does not offer (e.g. `unknown` on a yes/no question). */
+class AnswerNotOfferedException(
+    val questionId: String,
+    val answer: Answer,
+) : RuntimeException("Question $questionId does not offer $answer")
+
+/** Answers change only while the assessment is a draft. */
+class AssessmentNotEditableException(
+    val status: AssessmentStatus,
+) : RuntimeException("Assessment is $status: answers can no longer change")

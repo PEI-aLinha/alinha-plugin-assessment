@@ -1,6 +1,8 @@
 package pt.alinha.assessment.internal
 
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
@@ -9,18 +11,27 @@ import org.springframework.transaction.support.TransactionTemplate
 import pt.alinha.assessment.internal.domain.AssessmentStatus
 import pt.alinha.assessment.internal.domain.Questionnaire
 import pt.alinha.assessment.internal.domain.ScopeRules
+import pt.alinha.assessment.internal.persistence.AnswerEntity
 import pt.alinha.assessment.internal.persistence.AnswerRepository
 import pt.alinha.assessment.internal.persistence.AssessmentEntity
 import pt.alinha.assessment.internal.persistence.AssessmentRepository
 import pt.alinha.core.audit.AuditTrail
+import pt.alinha.core.compliance.Answer
 import pt.alinha.core.compliance.ApplicabilityInput
 import pt.alinha.core.compliance.ApplicabilityRules
 import pt.alinha.core.compliance.CatalogueRegistry
 import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 private const val ENTITY_TYPE = "assessment"
+
+/** ADR 0003: at most 100 items per page. */
+private const val MAX_PAGE_SIZE = 100
+
+/** PostgreSQL keeps microseconds: a response must show the same instant a later read returns. */
+private fun now(): Instant = Instant.now().truncatedTo(ChronoUnit.MICROS)
 
 /** Same pattern as the core's CatalogueLoader and the contract's StartAssessmentRequest.framework. */
 private val FRAMEWORK_ID = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -64,7 +75,7 @@ class AssessmentService(
             nis2Classification = resolved.nis2Classification,
             rulesVersion = resolved.rulesVersion,
             scopeInput = json.writeValueAsString(scope),
-            createdAt = Instant.now(),
+            createdAt = now(),
         )
         val saved = try {
             assessments.saveAndFlush(entity)
@@ -100,6 +111,69 @@ class AssessmentService(
                     "a published version must never be removed (RNF18)",
             )
         return Questionnaire(catalogue, assessment.maxLevel)
+    }
+
+    /** The organization's assessments, the most recently worked on first, so the user can resume where they stopped. */
+    @Transactional(readOnly = true)
+    fun list(page: Int, pageSize: Int): AssessmentPage {
+        val request = PageRequest.of(
+            page.coerceAtLeast(0),
+            pageSize.coerceIn(1, MAX_PAGE_SIZE),
+            Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.asc("id")),
+        )
+        val result = assessments.findAllBy(request)
+        val items = result.content.map { assessment ->
+            AssessmentSummary(
+                id = assessment.id,
+                framework = assessment.framework,
+                catalogueVersion = assessment.catalogueVersion,
+                status = assessment.status.apiValue(),
+                progress = progress(assessment, questionnaire(assessment)),
+                createdAt = assessment.createdAt,
+                updatedAt = assessment.updatedAt,
+            )
+        }
+        return AssessmentPage(items, request.pageNumber, request.pageSize, result.totalElements)
+    }
+
+    /**
+     * Saves one answer (autosave). Sending the value already saved changes nothing and writes no audit entry; every
+     * real change is audited with the previous and the new value (RNF04).
+     */
+    @Transactional
+    fun saveAnswer(id: UUID, questionId: String, answer: Answer): SavedAnswer {
+        // The row lock makes answers (and, later, the submit) of one assessment run one at a time.
+        val assessment = assessments.findForUpdateById(id) ?: throw AssessmentNotFoundException()
+        if (!assessment.status.acceptsAnswers) throw AssessmentNotEditableException(assessment.status)
+        val questionnaire = questionnaire(assessment)
+        val question = questionnaire.question(questionId) ?: throw QuestionNotInAssessmentException(questionId)
+        if (answer !in question.answers) throw AnswerNotOfferedException(questionId, answer)
+
+        val now = now()
+        val existing = answers.findOneByAssessmentIdAndQuestionId(id, questionId)
+        val current = if (existing == null) {
+            answers.save(AnswerEntity(UUID.randomUUID(), id, questionId, answer, now))
+                .also { changed(assessment, questionId, previous = null, answer, now) }
+        } else {
+            existing.change(answer, now)?.let { previous -> changed(assessment, questionId, previous, answer, now) }
+            existing
+        }
+        return SavedAnswer(questionId, current.value, current.answeredAt, progress(assessment, questionnaire))
+    }
+
+    /** Audit details hold the question id and status codes only, never free text (AuditTrail rule). */
+    private fun changed(assessment: AssessmentEntity, questionId: String, previous: Answer?, answer: Answer, now: Instant) {
+        assessment.touch(now)
+        audit.record(
+            "assessment.answer.saved", ENTITY_TYPE, assessment.id.toString(),
+            mapOf("questionId" to questionId, "from" to previous?.name, "to" to answer.name),
+        )
+    }
+
+    /** Only answers to questions of this questionnaire count. */
+    private fun progress(assessment: AssessmentEntity, questionnaire: Questionnaire): ProgressView {
+        val answered = answers.findAllByAssessmentId(assessment.id).count { questionnaire.question(it.questionId) != null }
+        return ProgressView(answered, questionnaire.questionCount)
     }
 
     private fun openAssessment(framework: String): UUID? =
