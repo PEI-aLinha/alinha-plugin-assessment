@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError, type PluginHost } from '@alinha/plugin-sdk'
-import { ASSESSMENTS_PATH, assessmentPath, type AssessmentPage as Page } from '../api'
+import { ASSESSMENTS_PATH, assessmentPath, submitPath, type AssessmentPage as Page } from '../api'
 import { ASSESSMENT_ID, assessmentDetail, assessmentPage } from '../test/fixtures'
 import { BASE, renderAt } from '../test/renderWithHost'
 
@@ -202,5 +202,84 @@ describe('AssessmentPage with no assessment yet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Começar a avaliação' }))
 
     expect(await screen.findByText('de 5 perguntas respondidas')).toBeInTheDocument()
+  })
+})
+
+describe('AssessmentPage submit', () => {
+  /** Every question answered, still a draft. */
+  const complete = () => {
+    const detail = assessmentDetail()
+    return {
+      ...detail,
+      progress: { answered: 5, total: 5 },
+      controls: detail.controls.map((c) => ({
+        ...c,
+        questions: c.questions.map((q) => ({ ...q, answer: 'yes' as const, answeredAt: '2026-11-22T10:00:00Z' })),
+      })),
+    }
+  }
+  const evaluated = { ...assessmentPage().items[0], status: 'evaluated' as const, progress: { answered: 5, total: 5 } }
+  const api = (submit: () => unknown = () => evaluated) => fakeApi({
+    [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage([complete()]),
+    [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => complete(),
+    [`POST ${submitPath(ASSESSMENT_ID)}`]: submit,
+  })
+
+  it('is only offered once every question is answered', async () => {
+    renderAt(BASE, { host: { api: fakeApi({
+      [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage(),
+      [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => assessmentDetail(),
+    }) } })
+
+    expect(await screen.findByText('de 5 perguntas respondidas')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submeter avaliação' })).not.toBeInTheDocument()
+  })
+
+  it('submits after a confirmation and then shows the answers as frozen', async () => {
+    const calls = api()
+    renderAt(BASE, { host: { api: calls } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Submeter avaliação' }))
+    const dialog = screen.getByRole('dialog', { name: 'Submeter a avaliação?' })
+    expect(within(dialog).getByText(/as respostas ficam fechadas/)).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Submeter' }))
+
+    expect(await screen.findByText('Avaliação submetida. A consultora vai rever os resultados.')).toBeInTheDocument()
+    expect(await screen.findByText('A avaliação já foi submetida. As respostas já não podem ser alteradas.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submeter avaliação' })).not.toBeInTheDocument()
+    expect(calls).toHaveBeenCalledWith(submitPath(ASSESSMENT_ID), expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('does nothing when the confirmation is cancelled', async () => {
+    const calls = api()
+    renderAt(BASE, { host: { api: calls } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Submeter avaliação' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(calls).not.toHaveBeenCalledWith(submitPath(ASSESSMENT_ID), expect.anything())
+  })
+
+  it('shows the reason when the submit fails', async () => {
+    const failing = api(() => {
+      throw new ApiError(422, submitPath(ASSESSMENT_ID), undefined, {
+        code: 'ASSESSMENT_INCOMPLETE', detail: 'Ainda há perguntas por responder.',
+      })
+    })
+    renderAt(BASE, { host: { api: failing } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Submeter avaliação' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submeter' }))
+
+    expect(await screen.findByText('Ainda há perguntas por responder.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submeter avaliação' })).toBeInTheDocument()
+  })
+
+  it('tells someone who cannot submit who does it', async () => {
+    renderAt(BASE, { host: { api: api(), can: (resource, action) => !(resource === 'assessment' && action === 'submit') } })
+
+    expect(await screen.findByText(/A pessoa responsável pela organização pode agora submeter a avaliação/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submeter avaliação' })).not.toBeInTheDocument()
   })
 })

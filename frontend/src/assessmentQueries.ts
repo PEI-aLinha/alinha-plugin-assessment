@@ -5,9 +5,11 @@ import {
   assessmentPath,
   ASSESSMENTS_PATH,
   KEYS,
+  submitPath,
   type AnswerValue,
   type AssessmentDetail,
   type AssessmentPage,
+  type AssessmentSummary,
   type SavedAnswer,
   type StartAssessmentRequest,
 } from './api'
@@ -44,6 +46,22 @@ export function useSaveAnswer(assessmentId: string) {
     invalidates: [KEYS.list],
     onSuccess: (saved) => {
       queryClient.setQueryData<AssessmentDetail>(detailKey(assessmentId), (old) => old && applySavedAnswer(old, saved))
+    },
+  })
+}
+
+/**
+ * Submits the assessment (assessment#5). The response is the summary, now `evaluated`: the cached detail takes
+ * its status, so the page shows the answers as frozen at once.
+ */
+export function useSubmitAssessment(assessmentId: string) {
+  const queryClient = useQueryClient()
+  return useApiMutation<void, AssessmentSummary>({
+    path: submitPath(assessmentId),
+    invalidates: [KEYS.list],
+    onSuccess: (summary) => {
+      queryClient.setQueryData<AssessmentDetail>(detailKey(assessmentId), (old) =>
+        old && { ...old, status: summary.status, updatedAt: summary.updatedAt })
     },
   })
 }
