@@ -19,6 +19,8 @@ jobs:
       plugin-path: plugins/feature/assessment
       gradle-project: assessment
       npm-package: "@alinha/plugin-assessment"
+      # TEMPORARY (assessment#3): the main repo's branch with the updated pnpm-lock.yaml. Remove before merging.
+      main-ref: feat/3-questionnaire-ui
     secrets:
       ALINHA_READ_TOKEN: ${{ secrets.ALINHA_READ_TOKEN }}   # private repos only
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
