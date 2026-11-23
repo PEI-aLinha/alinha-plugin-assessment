@@ -77,6 +77,32 @@ describe('QuestionPage', () => {
     expect(screen.getByRole('radio', { name: /^Sim/ })).toBeChecked()
   })
 
+  it('does not leave the question while a save is on its way, so the last choice is not lost', async () => {
+    let release: () => void = () => {}
+    const first = new Promise<void>((resolve) => { release = resolve })
+    let calls = 0
+    const fn = api(assessmentDetail(), async (id, answer) => {
+      if (++calls === 1) await first
+      return saved(id, answer)
+    })
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Não(?! sei)/ }))
+    await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
+    fireEvent.click(screen.getByRole('radio', { name: /^Sim/ }))
+    for (const name of ['Seguinte →', '← Anterior', 'Guardar e continuar depois']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled()
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Seguinte →' }))
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+
+    await act(async () => { release() })
+    await waitFor(() => expect(putCalls(fn).map(([, a]) => a)).toEqual(['no', 'yes']))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Seguinte →' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Seguinte →' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'ID.GA-1-B-Q1')))
+  })
+
   it('goes back to the saved answer when a save fails', async () => {
     const fn = api(assessmentDetail(), async () => { throw new ApiError(409, 'x', undefined, { code: 'ASSESSMENT_NOT_EDITABLE', detail: 'A avaliação já foi submetida.' }) })
     renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'), { host: { api: fn } })

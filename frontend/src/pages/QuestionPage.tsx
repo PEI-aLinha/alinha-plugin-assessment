@@ -59,6 +59,8 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
   const navigate = useNavigate()
   const { question, control } = step
   const editable = assessment.status === 'draft' && can('assessment', 'answer')
+  // Leaving the page while a save is on its way would drop a choice still waiting to be sent: wait for it.
+  const [saving, setSaving] = useState(false)
   const go = (to: string) => navigate(to, { relative: 'path' })
 
   return (
@@ -71,14 +73,14 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
         <h2 className="text-[1.25rem] font-extrabold leading-snug">{question.text}</h2>
       </div>
 
-      {editable ? <AnswerOptions assessmentId={assessment.id} step={step} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
+      {editable ? <AnswerOptions assessmentId={assessment.id} step={step} saving={saving} onSavingChange={setSaving} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="secondary" disabled={!prev} onClick={() => prev && go(sibling(prev))}>← Anterior</Button>
+        <Button variant="secondary" disabled={!prev || saving} onClick={() => prev && go(sibling(prev))}>← Anterior</Button>
         <div className="flex flex-wrap justify-end gap-2">
-          {editable && <Button variant="secondary" onClick={() => go(OVERVIEW)}>Guardar e continuar depois</Button>}
+          {editable && <Button variant="secondary" disabled={saving} onClick={() => go(OVERVIEW)}>Guardar e continuar depois</Button>}
           {/* After the last question, back to the overview of the sections. */}
-          <Button onClick={() => go(next ? sibling(next) : OVERVIEW)}>{next ? 'Seguinte →' : 'Terminar'}</Button>
+          <Button disabled={saving} onClick={() => go(next ? sibling(next) : OVERVIEW)}>{next ? 'Seguinte →' : 'Terminar'}</Button>
         </div>
       </div>
     </Card>
@@ -88,15 +90,19 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
 /**
  * The options, saved as soon as one is chosen. Saves go one at a time and the last choice always wins: a choice
  * made while a save is on its way is sent when that one ends. A failed save shows an error and goes back to the
- * answer the server has.
+ * answer the server has. The page keeps `saving` so it can hold navigation until the last choice is saved.
  */
-function AnswerOptions({ assessmentId, step }: { assessmentId: string; step: Step }) {
+function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }: {
+  assessmentId: string
+  step: Step
+  saving: boolean
+  onSavingChange: (saving: boolean) => void
+}) {
   const toast = useToast()
   const save = useSaveAnswer(assessmentId)
   const { question } = step
   const [choice, setChoice] = useState<AnswerValue | null>(question.answer)
   const [savedAt, setSavedAt] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
   const wanted = useRef<AnswerValue | null>(question.answer)
   const inFlight = useRef(false)
   const serverAnswer = useRef<AnswerValue | null>(question.answer)
