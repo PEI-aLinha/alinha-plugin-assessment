@@ -13,13 +13,20 @@ class AssessmentPluginTest {
     @Test
     fun `roles get least privilege`() {
         val m = AssessmentPlugin().manifest
-        assertThat(m.permissions).containsExactlyInAnyOrder("assessment:read", "assessment:start", "assessment:answer")
+        assertThat(m.permissions).containsExactlyInAnyOrder(
+            "assessment:read", "assessment:start", "assessment:answer", "assessment:submit", "assessment:review",
+        )
         assertThat(m.rolePermissions).isEqualTo(
             mapOf(
-                "responsible" to setOf("assessment:read", "assessment:start", "assessment:answer"),
+                "responsible" to setOf("assessment:read", "assessment:start", "assessment:answer", "assessment:submit"),
                 "analyst" to setOf("assessment:read", "assessment:answer"),
-                "consultant" to setOf("assessment:read"),
+                "consultant" to setOf("assessment:read", "assessment:review"),
             ),
         )
+    }
+
+    @Test
+    fun `publishes the submit and evaluation events`() {
+        assertThat(AssessmentPlugin().manifest.publishes).containsExactlyInAnyOrder("AssessmentSubmitted", "AssessmentEvaluated")
     }
 }

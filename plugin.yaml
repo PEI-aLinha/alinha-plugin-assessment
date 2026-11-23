@@ -5,10 +5,12 @@ kind: feature
 version: 0.1.0
 # Where this repo lives as a submodule inside the main repo (PEI-aLinha/alinha)
 path: plugins/feature/assessment
-publishes: []     # events it publishes (e.g. AssessmentSubmitted)
+publishes: [AssessmentSubmitted, AssessmentEvaluated]     # events it publishes
 consumes: []      # events it consumes
 permissions:      # RBAC resources; role mapping lives in AssessmentPlugin.kt
   - assessment:read     # responsible, analyst, consultant
   - assessment:start    # responsible
   - assessment:answer   # responsible, analyst
+  - assessment:submit   # responsible
+  - assessment:review   # consultant
   
