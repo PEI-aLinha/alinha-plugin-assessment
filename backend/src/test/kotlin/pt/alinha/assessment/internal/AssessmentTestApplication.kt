@@ -23,6 +23,7 @@ import pt.alinha.core.audit.internal.AuditActor
 import pt.alinha.core.audit.internal.JpaAuditTrail
 import pt.alinha.core.compliance.ApplicabilityRules
 import pt.alinha.core.compliance.CatalogueRegistry
+import pt.alinha.core.compliance.ControlRules
 import pt.alinha.core.registry.PluginRegistry
 import pt.alinha.core.tenant.internal.CorrelationIdFilter
 import pt.alinha.core.tenant.internal.HibernateTenantResolver
@@ -47,7 +48,7 @@ import pt.alinha.core.tenant.internal.TenantWebConfig
     TenantWebConfig::class, TenantResolutionInterceptor::class, JwtTenantContext::class,
     HibernateTenantResolver::class, CorrelationIdFilter::class, ScopedCorrelationContext::class,
     AuditActor::class, JpaAuditTrail::class,
-    CatalogueRegistry::class, ApplicabilityRules::class,
+    CatalogueRegistry::class, ApplicabilityRules::class, ControlRules::class,
     AssessmentPlugin::class, AssessmentService::class, AssessmentController::class, AssessmentProblems::class,
 )
 class AssessmentTestApplication {

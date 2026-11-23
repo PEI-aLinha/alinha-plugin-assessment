@@ -43,6 +43,14 @@ class AssessmentNotEditableException(
     val status: AssessmentStatus,
 ) : RuntimeException("Assessment is $status: answers can no longer change")
 
+/** Submit needs an answer to every question of the assessment ([unanswered] in catalogue order). */
+class AssessmentIncompleteException(
+    val unanswered: List<String>,
+) : RuntimeException("${unanswered.size} question(s) without an answer")
+
+/** The assessment has not been evaluated yet, so it has no results. */
+class ResultsNotAvailableException : RuntimeException("Assessment has no results yet")
+
 /** A `page` or `pageSize` query parameter outside the contract's range (page >= 0, pageSize 1..100). */
 class InvalidPageException(
     val field: String,

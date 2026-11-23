@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import pt.alinha.assessment.internal.AnswerNotOfferedException
 import pt.alinha.assessment.internal.AssessmentAlreadyOpenException
+import pt.alinha.assessment.internal.AssessmentIncompleteException
+import pt.alinha.assessment.internal.ResultsNotAvailableException
 import pt.alinha.assessment.internal.AssessmentNotEditableException
 import pt.alinha.assessment.internal.AssessmentNotFoundException
 import pt.alinha.assessment.internal.CatalogueNotFoundException
@@ -83,6 +85,17 @@ class AssessmentProblems {
     fun notEditable(e: AssessmentNotEditableException) = problem(
         HttpStatus.CONFLICT, "ASSESSMENT_NOT_EDITABLE",
         "Esta avaliação já foi entregue e as respostas já não podem ser alteradas.",
+    )
+
+    @ExceptionHandler
+    fun incomplete(e: AssessmentIncompleteException) = problem(
+        HttpStatus.UNPROCESSABLE_CONTENT, "ASSESSMENT_INCOMPLETE",
+        "Ainda há perguntas por responder. Responda a todas antes de entregar a avaliação.",
+    ).apply { setProperty("unanswered", e.unanswered) }
+
+    @ExceptionHandler
+    fun resultsNotAvailable(e: ResultsNotAvailableException) = problem(
+        HttpStatus.CONFLICT, "RESULTS_NOT_AVAILABLE", "Esta avaliação ainda não tem resultados.",
     )
 
     private fun problem(status: HttpStatus, code: String, detail: String) =
