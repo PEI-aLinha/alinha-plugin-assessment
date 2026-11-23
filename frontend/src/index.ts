@@ -1,6 +1,7 @@
 import { definePlugin } from '@alinha/plugin-sdk'
 import { ClipboardCheck } from 'lucide-react'
 import { AssessmentPage } from './pages/AssessmentPage'
+import { QuestionPage } from './pages/QuestionPage'
 
 /**
  * The plugin's frontend entry point. The shell reads this object and mounts
@@ -16,6 +17,7 @@ export default definePlugin({
   routes: {
     client: [
       { path: 'assessment', handle: { title: 'Avaliação' }, Component: AssessmentPage },
+      { path: 'assessment/:assessmentId/questions/:questionId', handle: { title: 'Avaliação' }, Component: QuestionPage },
     ],
   },
   nav: [
