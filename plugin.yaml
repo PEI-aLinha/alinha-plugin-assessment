@@ -7,4 +7,8 @@ version: 0.1.0
 path: plugins/feature/assessment
 publishes: []     # events it publishes (e.g. AssessmentSubmitted)
 consumes: []      # events it consumes
-permissions: []   # RBAC resources (e.g. assessment:read, assessment:edit)
+permissions:      # RBAC resources; role mapping lives in AssessmentPlugin.kt
+  - assessment:read     # responsible, analyst, consultant
+  - assessment:start    # responsible
+  - assessment:answer   # responsible, analyst
+  
