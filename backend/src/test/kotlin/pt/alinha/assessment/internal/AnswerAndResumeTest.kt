@@ -223,8 +223,19 @@ class AnswerAndResumeTest {
     }
 
     @Test
-    fun `page size is capped at 100`() {
-        mvc.get("$ASSESSMENTS?pageSize=500") { header("Authorization", "Bearer $responsible") }.andExpect {
+    fun `page and page size outside the contract's range are rejected`() {
+        for ((query, field) in listOf("pageSize=500" to "pageSize", "pageSize=0" to "pageSize", "page=-1" to "page")) {
+            mvc.get("$ASSESSMENTS?$query") { header("Authorization", "Bearer $responsible") }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("VALIDATION_FAILED") }
+                jsonPath("$.errors[0].field") { value(field) }
+            }
+        }
+    }
+
+    @Test
+    fun `the largest page size is accepted`() {
+        mvc.get("$ASSESSMENTS?pageSize=100") { header("Authorization", "Bearer $responsible") }.andExpect {
             status { isOk() }
             jsonPath("$.pageSize") { value(100) }
         }

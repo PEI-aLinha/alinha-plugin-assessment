@@ -42,3 +42,8 @@ class AnswerNotOfferedException(
 class AssessmentNotEditableException(
     val status: AssessmentStatus,
 ) : RuntimeException("Assessment is $status: answers can no longer change")
+
+/** A `page` or `pageSize` query parameter outside the contract's range (page >= 0, pageSize 1..100). */
+class InvalidPageException(
+    val field: String,
+) : RuntimeException("Query parameter $field is out of range")

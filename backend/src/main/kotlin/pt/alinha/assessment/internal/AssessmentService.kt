@@ -20,6 +20,7 @@ import pt.alinha.core.compliance.Answer
 import pt.alinha.core.compliance.ApplicabilityInput
 import pt.alinha.core.compliance.ApplicabilityRules
 import pt.alinha.core.compliance.CatalogueRegistry
+import pt.alinha.core.compliance.ComplianceLevel
 import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -116,19 +117,23 @@ class AssessmentService(
     /** The organization's assessments, the most recently worked on first, so the user can resume where they stopped. */
     @Transactional(readOnly = true)
     fun list(page: Int, pageSize: Int): AssessmentPage {
-        val request = PageRequest.of(
-            page.coerceAtLeast(0),
-            pageSize.coerceIn(1, MAX_PAGE_SIZE),
-            Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.asc("id")),
-        )
+        if (page < 0) throw InvalidPageException("page")
+        if (pageSize !in 1..MAX_PAGE_SIZE) throw InvalidPageException("pageSize")
+        val request = PageRequest.of(page, pageSize, Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.asc("id")))
         val result = assessments.findAllBy(request)
+        // One query for the answers of the whole page, and one questionnaire per catalogue version and level.
+        val answered = answers.findAllByAssessmentIdIn(result.content.map { it.id }).groupBy({ it.assessmentId }, { it.questionId })
+        val questionnaires = mutableMapOf<Triple<String, Int, ComplianceLevel>, Questionnaire>()
         val items = result.content.map { assessment ->
+            val questionnaire = questionnaires.getOrPut(
+                Triple(assessment.framework, assessment.catalogueVersion, assessment.maxLevel),
+            ) { questionnaire(assessment) }
             AssessmentSummary(
                 id = assessment.id,
                 framework = assessment.framework,
                 catalogueVersion = assessment.catalogueVersion,
                 status = assessment.status.apiValue(),
-                progress = progress(assessment, questionnaire(assessment)),
+                progress = progress(answered[assessment.id].orEmpty(), questionnaire),
                 createdAt = assessment.createdAt,
                 updatedAt = assessment.updatedAt,
             )
@@ -158,7 +163,8 @@ class AssessmentService(
             existing.change(answer, now)?.let { previous -> changed(assessment, questionId, previous, answer, now) }
             existing
         }
-        return SavedAnswer(questionId, current.value, current.answeredAt, progress(assessment, questionnaire))
+        val progress = progress(answers.findAllByAssessmentId(id).map { it.questionId }, questionnaire)
+        return SavedAnswer(questionId, current.value, current.answeredAt, progress)
     }
 
     /** Audit details hold the question id and status codes only, never free text (AuditTrail rule). */
@@ -171,10 +177,8 @@ class AssessmentService(
     }
 
     /** Only answers to questions of this questionnaire count. */
-    private fun progress(assessment: AssessmentEntity, questionnaire: Questionnaire): ProgressView {
-        val answered = answers.findAllByAssessmentId(assessment.id).count { questionnaire.question(it.questionId) != null }
-        return ProgressView(answered, questionnaire.questionCount)
-    }
+    private fun progress(answeredQuestionIds: Collection<String>, questionnaire: Questionnaire) =
+        ProgressView(answeredQuestionIds.count { questionnaire.question(it) != null }, questionnaire.questionCount)
 
     private fun openAssessment(framework: String): UUID? =
         assessments.findFirstByFrameworkAndStatusNot(framework, AssessmentStatus.VALIDATED)?.id
@@ -211,8 +215,7 @@ class AssessmentService(
             nis2Classification = assessment.nis2Classification.apiValue(),
             maxLevel = assessment.maxLevel,
             rulesVersion = assessment.rulesVersion,
-            // Only answers to questions of this questionnaire count.
-            progress = ProgressView(saved.keys.count { questionnaire.question(it) != null }, questionnaire.questionCount),
+            progress = progress(saved.keys, questionnaire),
             createdAt = assessment.createdAt,
             updatedAt = assessment.updatedAt,
             controls = controls,

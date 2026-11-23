@@ -12,6 +12,7 @@ import pt.alinha.assessment.internal.AssessmentNotFoundException
 import pt.alinha.assessment.internal.CatalogueNotFoundException
 import pt.alinha.assessment.internal.FrameworkNotInScopeException
 import pt.alinha.assessment.internal.InvalidFrameworkException
+import pt.alinha.assessment.internal.InvalidPageException
 import pt.alinha.assessment.internal.QuestionNotInAssessmentException
 import tools.jackson.core.JacksonException
 
@@ -40,6 +41,12 @@ class AssessmentProblems {
     fun invalidFramework(e: InvalidFrameworkException) =
         problem(HttpStatus.UNPROCESSABLE_CONTENT, VALIDATION_FAILED, FIX_DATA)
             .apply { setProperty("errors", listOf(error("framework", "Este regulamento não é válido."))) }
+
+    /** The contract declares `400` for the list's query parameters. */
+    @ExceptionHandler
+    fun invalidPage(e: InvalidPageException) =
+        problem(HttpStatus.BAD_REQUEST, VALIDATION_FAILED, FIX_DATA)
+            .apply { setProperty("errors", listOf(error(e.field, INVALID_VALUE))) }
 
     @ExceptionHandler
     fun notInScope(e: FrameworkNotInScopeException) = problem(
