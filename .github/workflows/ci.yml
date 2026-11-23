@@ -14,11 +14,13 @@ permissions:
 
 jobs:
   ci:
-    uses: PEI-aLinha/alinha/.github/workflows/plugin-ci.yml@main
+    # Coordinated change with PEI-aLinha/alinha#159 (contract + ControlRules): back to main once it merges.
+    uses: PEI-aLinha/alinha/.github/workflows/plugin-ci.yml@feat/assessment-submit
     with:
       plugin-path: plugins/feature/assessment
       gradle-project: assessment
       npm-package: "@alinha/plugin-assessment"
+      main-ref: feat/assessment-submit
     secrets:
       ALINHA_READ_TOKEN: ${{ secrets.ALINHA_READ_TOKEN }}   # private repos only
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
