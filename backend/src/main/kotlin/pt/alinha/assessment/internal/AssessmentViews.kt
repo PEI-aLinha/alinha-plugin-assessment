@@ -9,6 +9,11 @@ import java.util.UUID
 
 // Response bodies. Field names follow the OpenAPI schemas in contracts/openapi/alinha.yaml (assessment tag).
 
+/** The contract's `Level`: only what the screen shows, not the rest of the catalogue's level (e.g. evidence bars). */
+data class LevelView(val id: String, val label: String) {
+    constructor(level: Level) : this(level.id, level.label)
+}
+
 data class ProgressView(val answered: Int, val total: Int)
 
 data class QuestionView(
@@ -26,7 +31,7 @@ data class ControlView(
     val title: String,
     /** Deprecated in the contract: the level id. [scaleLevel] has the label too (ADR 0007). */
     val level: String,
-    val scaleLevel: Level,
+    val scaleLevel: LevelView,
     val technical: Boolean,
     val questions: List<QuestionView>,
 )
@@ -41,7 +46,7 @@ data class AssessmentDetail(
     val nis2ClassificationOfficial: Boolean,
     /** Deprecated in the contract: the level id. [maxScaleLevel] has the label too (ADR 0007). */
     val maxLevel: String,
-    val maxScaleLevel: Level,
+    val maxScaleLevel: LevelView,
     val rulesVersion: String,
     val progress: ProgressView,
     val createdAt: Instant,
