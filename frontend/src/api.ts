@@ -57,17 +57,8 @@ export interface AssessmentPage {
   total: number
 }
 
-export interface ApplicabilityInput {
-  size: { employees: number; annualTurnoverEur: number; annualBalanceSheetEur?: number | null }
-  publicBody?: boolean
-  nis2: { entityTypes?: string[]; criticalEntity?: boolean; significantImpact?: boolean; higherEducation?: boolean }
-  gdpr: { processesPersonalData: boolean }
-  aiAct: { usesAiSystems?: boolean; providesAiSystems?: boolean }
-}
-
 export interface StartAssessmentRequest {
   framework: string
-  scope: ApplicabilityInput
 }
 
 export interface SavedAnswer {
