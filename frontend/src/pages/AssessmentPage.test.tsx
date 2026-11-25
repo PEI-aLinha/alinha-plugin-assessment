@@ -28,6 +28,7 @@ describe('AssessmentPage with an assessment', () => {
 
     expect(await screen.findByText('de 5 perguntas respondidas')).toBeInTheDocument()
     expect(screen.getByText('entidade importante')).toBeInTheDocument()
+    expect(screen.getByText(/Classificação NIS2 indicativa/)).toBeInTheDocument()
     expect(screen.getByText(/as perguntas vão até ao nível substancial/)).toBeInTheDocument()
     // Collapsed until asked for.
     expect(screen.queryByRole('list', { name: 'Secções da avaliação' })).not.toBeInTheDocument()
@@ -35,6 +36,16 @@ describe('AssessmentPage with an assessment', () => {
     const sections = within(screen.getByRole('list', { name: 'Secções da avaliação' })).getAllByRole('button')
     expect(sections.map((b) => b.textContent?.trim())).toEqual(['Governação 1/2', 'Identificar 0/2', 'Proteger 0/1'])
     expect(screen.getByText('3 secções · 5 perguntas')).toBeInTheDocument()
+  })
+
+  it('says when the classification is the official one from the CNCS', async () => {
+    const detail = assessmentDetail({ nis2Classification: 'essential', nis2ClassificationOfficial: true })
+    const api = fakeApi({ [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage(), [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => detail })
+    renderAt(BASE, { host: { api } })
+
+    expect(await screen.findByText(/Classificação NIS2 oficial \(CNCS\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/indicativa/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/A classificação oficial é feita pelo CNCS/)).not.toBeInTheDocument()
   })
 
   it('continues at the first unanswered question', async () => {

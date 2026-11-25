@@ -13,6 +13,8 @@ data class AssessmentScope(
     val maxLevel: ComplianceLevel,
     val nis2Classification: Nis2Classification,
     val rulesVersion: String,
+    /** [nis2Classification] is the official CNCS qualification, not the indicative one. */
+    val nis2ClassificationOfficial: Boolean = false,
 )
 
 object ScopeRules {
@@ -29,7 +31,10 @@ object ScopeRules {
 
         val classification = applicability.effectiveNis2Classification
         val maxLevel = if (framework == ApplicabilityRules.NIS2) maxLevel(classification) else ComplianceLevel.HIGH
-        return AssessmentScope(framework, maxLevel, classification, applicability.rulesVersion)
+        return AssessmentScope(
+            framework, maxLevel, classification, applicability.rulesVersion,
+            nis2ClassificationOfficial = applicability.officialNis2Classification != null,
+        )
     }
 
     /**

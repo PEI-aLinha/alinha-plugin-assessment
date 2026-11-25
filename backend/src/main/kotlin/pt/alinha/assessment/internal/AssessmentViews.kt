@@ -36,6 +36,7 @@ data class AssessmentDetail(
     val catalogueTitle: String,
     val status: String,
     val nis2Classification: String,
+    val nis2ClassificationOfficial: Boolean,
     val maxLevel: ComplianceLevel,
     val rulesVersion: String,
     val progress: ProgressView,
