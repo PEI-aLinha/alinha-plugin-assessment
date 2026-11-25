@@ -10,7 +10,6 @@ import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 import pt.alinha.assessment.internal.domain.AssessmentStatus
 import pt.alinha.assessment.internal.domain.IllegalStatusTransitionException
-import pt.alinha.core.compliance.ComplianceLevel
 import pt.alinha.core.compliance.Nis2Classification
 import pt.alinha.core.tenant.TenantOwnedEntity
 import java.time.Instant
@@ -23,7 +22,8 @@ class AssessmentEntity(
     @Id val id: UUID,
     @Column(updatable = false) val framework: String,
     @Column(name = "catalogue_version", updatable = false) val catalogueVersion: Int,
-    @Enumerated(EnumType.STRING) @Column(name = "max_level", updatable = false) val maxLevel: ComplianceLevel,
+    /** Id of the highest level asked, in the catalogue's own level scale (ADR 0007). */
+    @Column(name = "max_level", updatable = false) val maxLevel: String,
     @Enumerated(EnumType.STRING) @Column(name = "nis2_classification", updatable = false)
     val nis2Classification: Nis2Classification,
     @Column(name = "rules_version", updatable = false) val rulesVersion: String,

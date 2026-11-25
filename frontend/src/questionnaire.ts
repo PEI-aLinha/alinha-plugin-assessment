@@ -1,4 +1,4 @@
-import type { AnswerValue, AssessmentDetail, ComplianceLevel, Nis2Classification, QuestionnaireControl, QuestionnaireQuestion } from './api'
+import type { AnswerValue, AssessmentDetail, Nis2Classification, QuestionnaireControl, QuestionnaireQuestion } from './api'
 
 /** The six areas of the QNRCS, by control id prefix (`GR.CO-1-B` → GR). The contract has no domain field. */
 export const SECTIONS = [
@@ -78,12 +78,6 @@ export const ANSWER_HINT: Record<AnswerValue, string> = {
   partial: 'Só em alguns sistemas, equipas ou casos.',
   no: 'Não está implementado.',
   unknown: 'Não tem a certeza. Pode voltar a esta pergunta mais tarde.',
-}
-
-export const LEVEL_LABEL: Record<ComplianceLevel, string> = {
-  basic: 'básico',
-  substantial: 'substancial',
-  high: 'elevado',
 }
 
 export const CLASSIFICATION_LABEL: Record<Nis2Classification, string> = {

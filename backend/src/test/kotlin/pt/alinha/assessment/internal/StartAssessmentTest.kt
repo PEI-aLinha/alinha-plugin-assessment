@@ -21,7 +21,6 @@ import org.springframework.web.context.request.RequestContextHolder
 import pt.alinha.assessment.internal.persistence.AssessmentEntity
 import pt.alinha.assessment.internal.persistence.AssessmentRepository
 import pt.alinha.core.compliance.ApplicabilityRules
-import pt.alinha.core.compliance.ComplianceLevel
 import pt.alinha.core.compliance.Nis2Classification
 import pt.alinha.core.tenant.TenantContext
 import pt.alinha.pluginapi.TenantId
@@ -104,6 +103,9 @@ class StartAssessmentTest {
             jsonPath("$.catalogueVersion") { value(2) }
             jsonPath("$.nis2Classification") { value("important") }
             jsonPath("$.maxLevel") { value("substantial") }
+            jsonPath("$.maxScaleLevel.id") { value("substantial") }
+            jsonPath("$.maxScaleLevel.label") { value("Substancial") }
+            jsonPath("$.controls[0].scaleLevel.label") { value("Básico") }
             jsonPath("$.rulesVersion") { value(ApplicabilityRules.VERSION) }
             jsonPath("$.controls[*].id") { value(contains("CTRL-A", "CTRL-B", "CTRL-D")) }
             jsonPath("$.progress.total") { value(3) }
@@ -227,7 +229,7 @@ class StartAssessmentTest {
         asTenant {
             assessments.save(
                 AssessmentEntity(
-                    id, "nis2-qnrcs", 1, ComplianceLevel.SUBSTANTIAL, Nis2Classification.IMPORTANT, "r1", "{}",
+                    id, "nis2-qnrcs", 1, "substantial", Nis2Classification.IMPORTANT, "r1", "{}",
                     Instant.now().truncatedTo(ChronoUnit.MICROS),
                 ),
             )

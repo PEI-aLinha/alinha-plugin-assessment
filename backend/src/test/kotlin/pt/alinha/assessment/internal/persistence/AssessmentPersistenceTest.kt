@@ -16,7 +16,6 @@ import pt.alinha.assessment.internal.AssessmentTestApplication
 import pt.alinha.assessment.internal.domain.AssessmentStatus
 import pt.alinha.assessment.internal.domain.IllegalStatusTransitionException
 import pt.alinha.core.compliance.Answer
-import pt.alinha.core.compliance.ComplianceLevel
 import pt.alinha.core.compliance.Nis2Classification
 import pt.alinha.core.tenant.TenantContext
 import pt.alinha.pluginapi.TenantId
@@ -61,7 +60,7 @@ class AssessmentPersistenceTest {
         id = UUID.randomUUID(),
         framework = framework,
         catalogueVersion = 1,
-        maxLevel = ComplianceLevel.SUBSTANTIAL,
+        maxLevel = "substantial",
         nis2Classification = Nis2Classification.IMPORTANT,
         rulesVersion = "r1",
         scopeInput = """{"size": {"employees": 120}}""",

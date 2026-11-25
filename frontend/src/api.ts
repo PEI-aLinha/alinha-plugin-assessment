@@ -5,7 +5,11 @@
  */
 
 export type AnswerValue = 'yes' | 'partial' | 'no' | 'unknown'
-export type ComplianceLevel = 'basic' | 'substantial' | 'high'
+/** One level of the catalogue's own level scale (ADR 0007): `substantial` "Substancial", `3` "Definido". */
+export interface Level {
+  id: string
+  label: string
+}
 export type AssessmentStatus = 'draft' | 'submitted' | 'evaluated' | 'validated'
 export type Nis2Classification = 'essential' | 'important' | 'not-covered' | 'to-be-assessed'
 
@@ -37,7 +41,9 @@ export interface QuestionnaireQuestion {
 export interface QuestionnaireControl {
   id: string
   title: string
-  level: ComplianceLevel
+  /** @deprecated the level id; use `scaleLevel`. */
+  level: string
+  scaleLevel: Level
   technical: boolean
   questions: QuestionnaireQuestion[]
 }
@@ -45,7 +51,9 @@ export interface QuestionnaireControl {
 export interface AssessmentDetail extends AssessmentSummary {
   catalogueTitle: string
   nis2Classification: Nis2Classification
-  maxLevel: ComplianceLevel
+  /** @deprecated the level id; use `maxScaleLevel`. */
+  maxLevel: string
+  maxScaleLevel: Level
   rulesVersion: string
   controls: QuestionnaireControl[]
 }

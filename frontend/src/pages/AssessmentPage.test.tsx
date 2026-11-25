@@ -37,6 +37,14 @@ describe('AssessmentPage with an assessment', () => {
     expect(screen.getByText('3 secções · 5 perguntas')).toBeInTheDocument()
   })
 
+  it('names the highest level with the label of the catalogue\'s own scale', async () => {
+    const detail = assessmentDetail({ maxLevel: '3', maxScaleLevel: { id: '3', label: 'Definido' } })
+    const api = fakeApi({ [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage(), [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => detail })
+    renderAt(BASE, { host: { api } })
+
+    expect(await screen.findByText(/as perguntas vão até ao nível definido/)).toBeInTheDocument()
+  })
+
   it('continues at the first unanswered question', async () => {
     const { router } = renderAt(BASE, { host: { api: api() } })
 
