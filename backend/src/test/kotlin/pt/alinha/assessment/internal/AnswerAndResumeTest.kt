@@ -50,6 +50,7 @@ class AnswerAndResumeTest {
     @Autowired private lateinit var assessments: AssessmentRepository
     @Autowired private lateinit var tenants: TenantContext
     @Autowired private lateinit var tx: TransactionTemplate
+    @Autowired private lateinit var scopes: FakeApplicabilityQuery
 
     private lateinit var sub: String
     private lateinit var tenant: UUID
@@ -63,10 +64,11 @@ class AnswerAndResumeTest {
 
     /** Starts an assessment as the responsible person and returns its id. */
     private fun started(framework: String = "nis2-qnrcs", scope: String = IMPORTANT_SCOPE): String {
+        scopes.declare(tenant, scope)
         val body = mvc.post(ASSESSMENTS) {
             header("Authorization", "Bearer $responsible")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"framework": "$framework", "scope": $scope}"""
+            content = """{"framework": "$framework"}"""
         }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
         return JsonPath.read(body, "$.id")
     }

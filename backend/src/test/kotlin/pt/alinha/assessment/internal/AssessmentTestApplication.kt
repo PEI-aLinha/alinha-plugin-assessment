@@ -30,10 +30,11 @@ import pt.alinha.core.tenant.internal.JwtTenantContext
 import pt.alinha.core.tenant.internal.ScopedCorrelationContext
 import pt.alinha.core.tenant.internal.TenantResolutionInterceptor
 import pt.alinha.core.tenant.internal.TenantWebConfig
+import tools.jackson.databind.json.JsonMapper
 
 /**
  * The plugin with the core's real RBAC, tenant resolution, audit trail and catalogues on PostgreSQL. Only the JWT
- * decoder is a fake, and the catalogues are the test ones (src/test/resources/frameworks, see its README).
+ * decoder and the organization's applicability ([FakeApplicabilityQuery]) are fakes, and the catalogues are the test ones (src/test/resources/frameworks, see its README).
  * Token value: `<role>.<sub>.<tenant>` (a colon is not allowed in a Bearer token); a consultant's tenant goes to
  * `tenants`, a client user's to `tenant_id`.
  */
@@ -51,6 +52,9 @@ import pt.alinha.core.tenant.internal.TenantWebConfig
     AssessmentPlugin::class, AssessmentService::class, AssessmentController::class, AssessmentProblems::class,
 )
 class AssessmentTestApplication {
+    @Bean
+    fun fakeApplicabilityQuery(rules: ApplicabilityRules, json: JsonMapper) = FakeApplicabilityQuery(rules, json)
+
     @Bean
     @Primary
     fun testJwtDecoder(): JwtDecoder = JwtDecoder { token ->
