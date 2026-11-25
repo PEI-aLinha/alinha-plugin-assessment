@@ -80,6 +80,7 @@ class AssessmentService(
             catalogueVersion = catalogue.version,
             maxLevel = maxLevel,
             nis2Classification = resolved.nis2Classification,
+            nis2ClassificationOfficial = resolved.nis2ClassificationOfficial,
             rulesVersion = resolved.rulesVersion,
             scopeInput = json.writeValueAsString(scope),
             createdAt = now(),
@@ -99,6 +100,7 @@ class AssessmentService(
                 "catalogueVersion" to catalogue.version,
                 "maxLevel" to maxLevel,
                 "nis2Classification" to resolved.nis2Classification.name,
+                "nis2ClassificationOfficial" to resolved.nis2ClassificationOfficial,
                 "rulesVersion" to resolved.rulesVersion,
             ),
         )
@@ -220,6 +222,7 @@ class AssessmentService(
             catalogueTitle = questionnaire.catalogue.title,
             status = assessment.status.apiValue(),
             nis2Classification = assessment.nis2Classification.apiValue(),
+            nis2ClassificationOfficial = assessment.nis2ClassificationOfficial,
             maxLevel = assessment.maxLevel,
             maxScaleLevel = questionnaire.maxScaleLevel,
             rulesVersion = assessment.rulesVersion,

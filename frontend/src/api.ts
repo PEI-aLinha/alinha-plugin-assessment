@@ -51,6 +51,8 @@ export interface QuestionnaireControl {
 export interface AssessmentDetail extends AssessmentSummary {
   catalogueTitle: string
   nis2Classification: Nis2Classification
+  /** `nis2Classification` is the official CNCS qualification, not the indicative one. */
+  nis2ClassificationOfficial: boolean
   /** @deprecated the level id; use `maxScaleLevel`. */
   maxLevel: string
   maxScaleLevel: Level

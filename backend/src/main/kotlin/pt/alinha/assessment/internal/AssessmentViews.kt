@@ -38,6 +38,7 @@ data class AssessmentDetail(
     val catalogueTitle: String,
     val status: String,
     val nis2Classification: String,
+    val nis2ClassificationOfficial: Boolean,
     /** Deprecated in the contract: the level id. [maxScaleLevel] has the label too (ADR 0007). */
     val maxLevel: String,
     val maxScaleLevel: Level,

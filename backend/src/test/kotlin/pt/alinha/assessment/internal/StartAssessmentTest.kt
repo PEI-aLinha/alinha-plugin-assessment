@@ -102,6 +102,7 @@ class StartAssessmentTest {
             jsonPath("$.status") { value("draft") }
             jsonPath("$.catalogueVersion") { value(2) }
             jsonPath("$.nis2Classification") { value("important") }
+            jsonPath("$.nis2ClassificationOfficial") { value(false) }
             jsonPath("$.maxLevel") { value("substantial") }
             jsonPath("$.maxScaleLevel.id") { value("substantial") }
             jsonPath("$.maxScaleLevel.label") { value("Substancial") }
@@ -127,10 +128,16 @@ class StartAssessmentTest {
         assertThat(audit[0]["has_scope"]).isEqualTo(false)
 
         val scope = jdbc.queryForMap(
-            """select scope_input->>'nis2Classification' as classification, scope_input->>'rulesVersion' as rules
+            """select scope_input->>'nis2Classification' as classification, scope_input->>'rulesVersion' as rules,
+                      jsonb_exists(scope_input, 'indicative') or jsonb_exists(scope_input, 'effectiveNis2Classification')
+                          as derived,
+                      jsonb_exists(scope_input, 'officialNis2Classification') as has_official
                from assessment.assessment where id = ?::uuid""",
             id,
         )
+        // Only the stored facts, not the getters derived from them.
+        assertThat(scope["derived"]).isEqualTo(false)
+        assertThat(scope["has_official"]).isEqualTo(true)
         assertThat(scope["classification"]).isEqualTo("IMPORTANT")
         assertThat(scope["rules"]).isEqualTo(ApplicabilityRules.VERSION)
     }
@@ -208,6 +215,7 @@ class StartAssessmentTest {
         start("nis2-qnrcs", official = Nis2Classification.ESSENTIAL).andExpect {
             status { isCreated() }
             jsonPath("$.nis2Classification") { value("essential") }
+            jsonPath("$.nis2ClassificationOfficial") { value(true) }
             jsonPath("$.maxLevel") { value("high") }
         }
     }
