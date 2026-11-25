@@ -199,7 +199,9 @@ class AssessmentService(
                 id = control.id,
                 title = control.title,
                 level = control.level,
-                scaleLevel = questionnaire.catalogue.levels[questionnaire.catalogue.levelIndex(control.level)],
+                scaleLevel = LevelView(
+                    questionnaire.catalogue.levels[questionnaire.catalogue.levelIndex(control.level)],
+                ),
                 technical = control.technical,
                 questions = control.questions.map { question ->
                     val answer = saved[question.id]
@@ -224,7 +226,7 @@ class AssessmentService(
             nis2Classification = assessment.nis2Classification.apiValue(),
             nis2ClassificationOfficial = assessment.nis2ClassificationOfficial,
             maxLevel = assessment.maxLevel,
-            maxScaleLevel = questionnaire.maxScaleLevel,
+            maxScaleLevel = LevelView(questionnaire.maxScaleLevel),
             rulesVersion = assessment.rulesVersion,
             progress = progress(saved.keys, questionnaire),
             createdAt = assessment.createdAt,

@@ -106,6 +106,8 @@ class StartAssessmentTest {
             jsonPath("$.maxLevel") { value("substantial") }
             jsonPath("$.maxScaleLevel.id") { value("substantial") }
             jsonPath("$.maxScaleLevel.label") { value("Substancial") }
+            jsonPath("$.maxScaleLevel.length()") { value(2) }
+            jsonPath("$.controls[0].scaleLevel.length()") { value(2) }
             jsonPath("$.controls[0].scaleLevel.label") { value("Básico") }
             jsonPath("$.rulesVersion") { value(ApplicabilityRules.VERSION) }
             jsonPath("$.controls[*].id") { value(contains("CTRL-A", "CTRL-B", "CTRL-D")) }
