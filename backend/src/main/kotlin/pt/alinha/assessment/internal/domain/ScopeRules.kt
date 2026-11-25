@@ -18,8 +18,8 @@ data class AssessmentScope(
 object ScopeRules {
     /**
      * In scope when the rules say YES or REVIEW, or when they do not judge the framework at all (e.g. soc-cmm).
-     * Only nis2-qnrcs is cut by the NIS2 classification (the official one when registered, else the indicative one);
-     * every other framework gets every level.
+     * nis2-qnrcs and soc-cmm are cut by the NIS2 classification (the official one when registered, else the indicative
+     * one); every other framework gets every level of its scale.
      */
     fun resolve(framework: String, applicability: ApplicabilityResult): AssessmentScope {
         val entry = applicability.frameworks.firstOrNull { it.framework == framework }
@@ -28,7 +28,11 @@ object ScopeRules {
         if (entry?.applies == Applies.NO && !officiallyCovered) throw FrameworkNotInScopeException(framework)
 
         val classification = applicability.effectiveNis2Classification
-        val maxLevel = if (framework == ApplicabilityRules.NIS2) maxLevel(classification) else null
+        val maxLevel = when (framework) {
+            ApplicabilityRules.NIS2 -> maxLevel(classification)
+            SOC_CMM -> recommendedMaturity(classification)
+            else -> null
+        }
         return AssessmentScope(framework, maxLevel, classification, applicability.rulesVersion)
     }
 
@@ -44,4 +48,17 @@ object ScopeRules {
         Nis2Classification.TO_BE_ASSESSED -> "high"
         Nis2Classification.NOT_COVERED -> "basic"
     }
+
+    /**
+     * Recommended SOC-CMM maturity target for each NIS2 classification (ADR 0007): a recommendation, never a legal
+     * requirement. Maturity levels 4 and 5 are not asked of an organization whose target is lower.
+     */
+    fun recommendedMaturity(classification: Nis2Classification): String = when (classification) {
+        Nis2Classification.NOT_COVERED -> "2"
+        Nis2Classification.IMPORTANT -> "3"
+        Nis2Classification.ESSENTIAL -> "4"
+        Nis2Classification.TO_BE_ASSESSED -> "4"
+    }
+
+    const val SOC_CMM = "soc-cmm"
 }

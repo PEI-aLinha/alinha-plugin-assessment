@@ -76,8 +76,21 @@ class ScopeRulesTest {
 
     @Test
     fun `a framework the rules do not judge is in scope`() {
-        val scope = ScopeRules.resolve("soc-cmm", result(Nis2Classification.IMPORTANT))
+        val scope = ScopeRules.resolve("iso-27001", result(Nis2Classification.IMPORTANT))
         assertThat(scope.maxLevel).isNull()
+    }
+
+    @ParameterizedTest
+    @CsvSource("NOT_COVERED,2", "IMPORTANT,3", "ESSENTIAL,4", "TO_BE_ASSESSED,4")
+    fun `soc-cmm gets the recommended maturity target of the nis2 classification`(c: Nis2Classification, level: String) {
+        val scope = ScopeRules.resolve("soc-cmm", result(c))
+        assertThat(scope.maxLevel).isEqualTo(level)
+    }
+
+    @Test
+    fun `soc-cmm follows the official CNCS qualification`() {
+        val scope = ScopeRules.resolve("soc-cmm", result(Nis2Classification.IMPORTANT, official = Nis2Classification.ESSENTIAL))
+        assertThat(scope.maxLevel).isEqualTo("4")
     }
 
     @Test
