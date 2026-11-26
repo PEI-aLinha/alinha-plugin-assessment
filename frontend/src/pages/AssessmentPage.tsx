@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, CheckCircle2, ChevronDown, ClipboardCheck, Clock } from 'lucide-react'
-import { useHost } from '@alinha/plugin-sdk'
-import { Badge, Card, cn, EmptyState, ErrorState, Eyebrow, Note, PageHeader, SkeletonRows } from '@alinha/ui'
+import { errorMessage, useHost } from '@alinha/plugin-sdk'
+import { Badge, Button, Card, cn, EmptyState, ErrorState, Eyebrow, Modal, Note, PageHeader, SkeletonRows, useToast } from '@alinha/ui'
 import { FRAMEWORK, type AssessmentDetail, type AssessmentStatus } from '../api'
-import { useAssessmentDetail, useAssessmentList } from '../assessmentQueries'
+import { useAssessmentDetail, useAssessmentList, useSubmitAssessment } from '../assessmentQueries'
 import { ProgressBar } from '../components/ProgressBar'
 import { buildQuestionnaire, CLASSIFICATION_LABEL, LEVEL_LABEL, resumeStep, type Questionnaire } from '../questionnaire'
 import { StartAssessment } from './StartAssessment'
@@ -74,12 +74,49 @@ function Overview({ assessment }: { assessment: AssessmentDetail }) {
       </ProgressCard>
 
       {!draft && <Note>A avaliação já foi submetida. As respostas já não podem ser alteradas.</Note>}
-      {draft && total > 0 && answered === total && (
-        <Note>Respondeu a todas as perguntas. Pode rever as respostas enquanto a avaliação não for submetida.</Note>
-      )}
+      {draft && total > 0 && answered === total && <SubmitCard assessmentId={assessment.id} />}
 
       <SectionsTable questionnaire={questionnaire} questionLink={questionLink} />
     </div>
+  )
+}
+
+/**
+ * Every question is answered: the responsible person can submit, after a confirmation, because the answers are
+ * frozen from then on. Anyone else (an analyst) is told who submits.
+ */
+function SubmitCard({ assessmentId }: { assessmentId: string }) {
+  const { can } = useHost()
+  const toast = useToast()
+  const submit = useSubmitAssessment(assessmentId)
+  const [confirming, setConfirming] = useState(false)
+
+  if (!can('assessment', 'submit')) {
+    return <Note>Todas as perguntas estão respondidas. A pessoa responsável pela organização pode agora submeter a avaliação.</Note>
+  }
+
+  const confirm = () => {
+    submit.mutateAsync(undefined)
+      .then(() => toast.show('Avaliação submetida. A consultora vai rever os resultados.', 'success'))
+      .catch((error: unknown) => toast.show(errorMessage(error), 'error'))
+      .finally(() => setConfirming(false))
+  }
+
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-3">
+      <p className="min-w-0 flex-1 text-sm">
+        Respondeu a todas as perguntas. Pode rever as respostas ou submeter a avaliação.
+      </p>
+      <Button onClick={() => setConfirming(true)}>Submeter avaliação</Button>
+      <Modal open={confirming} onOpenChange={(open) => { if (!submit.isPending) setConfirming(open) }}
+        title="Submeter a avaliação?"
+        description="Depois de submeter, as respostas ficam fechadas e já não podem ser alteradas. A consultora revê os resultados antes de os partilhar consigo."
+        footer={<>
+          <Button variant="secondary" disabled={submit.isPending} onClick={() => setConfirming(false)}>Cancelar</Button>
+          <Button loading={submit.isPending} onClick={confirm}>Submeter</Button>
+        </>}
+      />
+    </Card>
   )
 }
 

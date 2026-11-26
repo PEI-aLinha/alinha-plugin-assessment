@@ -84,6 +84,7 @@ export const ASSESSMENTS_PATH = '/assessment/assessments'
 export const assessmentPath = (id: string) => `${ASSESSMENTS_PATH}/${id}`
 export const answerPath = (assessmentId: string, questionId: string) =>
   `${assessmentPath(assessmentId)}/answers/${encodeURIComponent(questionId)}`
+export const submitPath = (assessmentId: string) => `${assessmentPath(assessmentId)}/submit`
 
 /** Query keys start with the plugin id, so plugins never share a cache entry. */
 export const KEYS = {

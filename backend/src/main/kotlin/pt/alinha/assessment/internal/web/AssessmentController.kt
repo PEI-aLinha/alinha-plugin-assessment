@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import pt.alinha.assessment.internal.AssessmentDetail
 import pt.alinha.assessment.internal.AssessmentPage
+import pt.alinha.assessment.internal.AssessmentResults
 import pt.alinha.assessment.internal.AssessmentService
+import pt.alinha.assessment.internal.AssessmentSummary
 import pt.alinha.assessment.internal.SavedAnswer
 import pt.alinha.core.access.RequiresPermission
 import pt.alinha.core.compliance.Answer
@@ -57,4 +59,13 @@ class AssessmentController(private val assessments: AssessmentService) {
         @PathVariable("questionId") questionId: String,
         @RequestBody body: SaveAnswerRequest,
     ): SavedAnswer = assessments.saveAnswer(assessmentId, questionId, body.answer)
+
+    @RequiresPermission("assessment", "submit")
+    @PostMapping("/assessments/{assessmentId}/submit")
+    fun submit(@PathVariable("assessmentId") assessmentId: UUID): AssessmentSummary = assessments.submit(assessmentId)
+
+    /** Consultant only until assessment#8 lets the client see validated results. */
+    @RequiresPermission("assessment", "review")
+    @GetMapping("/assessments/{assessmentId}/results")
+    fun results(@PathVariable("assessmentId") assessmentId: UUID): AssessmentResults = assessments.results(assessmentId)
 }

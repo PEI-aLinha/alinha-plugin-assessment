@@ -1,5 +1,6 @@
 package pt.alinha.assessment.internal
 
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -8,6 +9,8 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
+import pt.alinha.assessment.events.AssessmentEvaluated
+import pt.alinha.assessment.events.AssessmentSubmitted
 import pt.alinha.assessment.internal.domain.AssessmentStatus
 import pt.alinha.assessment.internal.domain.Questionnaire
 import pt.alinha.assessment.internal.domain.ScopeRules
@@ -15,12 +18,22 @@ import pt.alinha.assessment.internal.persistence.AnswerEntity
 import pt.alinha.assessment.internal.persistence.AnswerRepository
 import pt.alinha.assessment.internal.persistence.AssessmentEntity
 import pt.alinha.assessment.internal.persistence.AssessmentRepository
+import pt.alinha.assessment.internal.persistence.ResultEntity
+import pt.alinha.assessment.internal.persistence.ResultRepository
+import pt.alinha.assessment.internal.persistence.StoredControl
+import pt.alinha.assessment.internal.persistence.complianceLevel
+import pt.alinha.assessment.internal.persistence.levelId
 import pt.alinha.core.audit.AuditTrail
 import pt.alinha.core.compliance.Answer
 import pt.alinha.core.compliance.ApplicabilityInput
 import pt.alinha.core.compliance.ApplicabilityRules
 import pt.alinha.core.compliance.CatalogueRegistry
+import pt.alinha.core.compliance.ComplianceEngine
 import pt.alinha.core.compliance.ComplianceLevel
+import pt.alinha.core.compliance.ControlStatus
+import pt.alinha.core.compliance.IncompleteAnswersException
+import pt.alinha.core.tenant.CorrelationContext
+import pt.alinha.core.tenant.TenantContext
 import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -49,6 +62,11 @@ class AssessmentService(
     private val applicability: ApplicabilityRules,
     private val audit: AuditTrail,
     private val json: JsonMapper,
+    private val results: ResultRepository,
+    private val engine: ComplianceEngine,
+    private val tenants: TenantContext,
+    private val correlation: CorrelationContext,
+    private val events: ApplicationEventPublisher,
     transactionManager: PlatformTransactionManager,
 ) {
     /** Reads the winner of a concurrent start: the current transaction is already broken by then. */
@@ -128,18 +146,107 @@ class AssessmentService(
             val questionnaire = questionnaires.getOrPut(
                 Triple(assessment.framework, assessment.catalogueVersion, assessment.maxLevel),
             ) { questionnaire(assessment) }
-            AssessmentSummary(
-                id = assessment.id,
-                framework = assessment.framework,
-                catalogueVersion = assessment.catalogueVersion,
-                status = assessment.status.apiValue(),
-                progress = progress(answered[assessment.id].orEmpty(), questionnaire),
-                createdAt = assessment.createdAt,
-                updatedAt = assessment.updatedAt,
-            )
+            toSummary(assessment, progress(answered[assessment.id].orEmpty(), questionnaire))
         }
         return AssessmentPage(items, request.pageNumber, request.pageSize, result.totalElements)
     }
+
+    /**
+     * Freezes the answers and has the Compliance Engine compute the results (assessment#5, FR10): draft -> submitted
+     * -> evaluated in this one transaction, each step audited (RNF04) and published as an event. The row lock makes
+     * a concurrent answer or second submit wait, and then fail on the status.
+     */
+    @Transactional
+    fun submit(id: UUID): AssessmentSummary {
+        val assessment = assessments.findForUpdateById(id) ?: throw AssessmentNotFoundException()
+        if (!assessment.status.acceptsAnswers) throw AssessmentNotEditableException(assessment.status)
+        val questionnaire = questionnaire(assessment)
+        val saved = answers.findAllByAssessmentId(id).associate { it.questionId to it.value }
+        val evaluation = try {
+            engine.evaluate(questionnaire.catalogue, assessment.maxLevel, saved)
+        } catch (e: IncompleteAnswersException) {
+            throw AssessmentIncompleteException(e.unanswered)
+        }
+
+        val now = now()
+        val tenant = tenants.current()
+        val progress = progress(saved.keys, questionnaire)
+        assessment.moveTo(AssessmentStatus.SUBMITTED, now)
+        audit.record(
+            "assessment.submitted", ENTITY_TYPE, id.toString(),
+            mapOf("answered" to progress.answered, "questions" to progress.total),
+        )
+        events.publishEvent(AssessmentSubmitted(tenant, correlation.current(), id, now))
+
+        results.save(
+            ResultEntity(
+                id = UUID.randomUUID(),
+                assessmentId = id,
+                engineVersion = evaluation.engineVersion,
+                currentLevel = evaluation.currentLevel?.levelId,
+                targetLevel = evaluation.targetLevel.levelId,
+                coverage = evaluation.coverage,
+                controls = json.writeValueAsString(
+                    evaluation.controls.map { StoredControl(it.controlId, it.level.levelId, it.status.name) },
+                ),
+                evaluatedAt = now,
+            ),
+        )
+        assessment.moveTo(AssessmentStatus.EVALUATED, now)
+        audit.record(
+            "assessment.evaluated", ENTITY_TYPE, id.toString(),
+            mapOf(
+                "engineVersion" to evaluation.engineVersion,
+                "currentLevel" to evaluation.currentLevel?.levelId,
+                "targetLevel" to evaluation.targetLevel.levelId,
+                "coverage" to evaluation.coverage,
+            ),
+        )
+        events.publishEvent(
+            AssessmentEvaluated(
+                tenant, correlation.current(), id, assessment.framework, assessment.catalogueVersion, now,
+            ),
+        )
+        return toSummary(assessment, progress)
+    }
+
+    /**
+     * The stored results, with the control titles from the assessment's pinned catalogue version. A stored control
+     * that is not in the questionnaire keeps its id as the title, rather than failing the whole page.
+     */
+    @Transactional(readOnly = true)
+    fun results(id: UUID): AssessmentResults {
+        val assessment = assessments.findOneById(id) ?: throw AssessmentNotFoundException()
+        val result = results.findOneByAssessmentId(id) ?: throw ResultsNotAvailableException()
+        val titles = questionnaire(assessment).controls.associate { it.id to it.title }
+        val controls = json.readValue(result.controls, Array<StoredControl>::class.java).map {
+            ControlResult(
+                controlId = it.controlId,
+                title = titles[it.controlId] ?: it.controlId,
+                level = complianceLevel(it.level),
+                status = ControlStatus.valueOf(it.status),
+            )
+        }
+        return AssessmentResults(
+            assessmentId = id,
+            evaluatedAt = result.evaluatedAt,
+            engineVersion = result.engineVersion,
+            currentLevel = result.currentLevel?.let(::complianceLevel),
+            targetLevel = complianceLevel(result.targetLevel),
+            coverage = result.coverage,
+            controls = controls,
+        )
+    }
+
+    private fun toSummary(assessment: AssessmentEntity, progress: ProgressView) = AssessmentSummary(
+        id = assessment.id,
+        framework = assessment.framework,
+        catalogueVersion = assessment.catalogueVersion,
+        status = assessment.status.apiValue(),
+        progress = progress,
+        createdAt = assessment.createdAt,
+        updatedAt = assessment.updatedAt,
+    )
 
     /**
      * Saves one answer (autosave). Sending the value already saved changes nothing and writes no audit entry; every

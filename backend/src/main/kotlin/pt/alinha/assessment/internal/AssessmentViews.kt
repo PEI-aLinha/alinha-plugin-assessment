@@ -3,6 +3,7 @@ package pt.alinha.assessment.internal
 import pt.alinha.assessment.internal.domain.AssessmentStatus
 import pt.alinha.core.compliance.Answer
 import pt.alinha.core.compliance.ComplianceLevel
+import pt.alinha.core.compliance.ControlStatus
 import pt.alinha.core.compliance.Nis2Classification
 import java.time.Instant
 import java.util.UUID
@@ -55,6 +56,18 @@ data class AssessmentSummary(
 )
 
 data class AssessmentPage(val items: List<AssessmentSummary>, val page: Int, val pageSize: Int, val total: Long)
+
+data class ControlResult(val controlId: String, val title: String, val level: ComplianceLevel, val status: ControlStatus)
+
+data class AssessmentResults(
+    val assessmentId: UUID,
+    val evaluatedAt: Instant,
+    val engineVersion: String,
+    val currentLevel: ComplianceLevel?,
+    val targetLevel: ComplianceLevel,
+    val coverage: Double,
+    val controls: List<ControlResult>,
+)
 
 data class SavedAnswer(val questionId: String, val answer: Answer, val answeredAt: Instant, val progress: ProgressView)
 

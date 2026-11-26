@@ -13,14 +13,15 @@ class AssessmentPlugin : AlinhaPlugin {
         name = "Assessment",
         kind = PluginKind.FEATURE,
         version = "0.1.0",
-        publishes = setOf(),
+        publishes = setOf("AssessmentSubmitted", "AssessmentEvaluated"),
         consumes = setOf(),
-        permissions = setOf(READ, START, ANSWER),
+        permissions = setOf(READ, START, ANSWER, SUBMIT, REVIEW),
         rolePermissions = mapOf(
-            "responsible" to setOf(READ, START, ANSWER),
+            "responsible" to setOf(READ, START, ANSWER, SUBMIT),
             // Analysts answer technical questions; assessment#4 later limits them to the questions assigned to them.
             "analyst" to setOf(READ, ANSWER),
-            "consultant" to setOf(READ),
+            // The consultant sees the computed results before the client does (assessment#5, #8).
+            "consultant" to setOf(READ, REVIEW),
         ),
     )
 
@@ -28,5 +29,7 @@ class AssessmentPlugin : AlinhaPlugin {
         const val READ = "assessment:read"
         const val START = "assessment:start"
         const val ANSWER = "assessment:answer"
+        const val SUBMIT = "assessment:submit"
+        const val REVIEW = "assessment:review"
     }
 }
