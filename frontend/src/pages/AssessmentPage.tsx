@@ -138,7 +138,7 @@ function SectionsTable({ questionnaire, questionLink }: { questionnaire: Questio
                     <ProgressBar value={section.answered} max={section.total} label={`Progresso de ${section.name}`} />
                     {first && (
                       <Link to={questionLink(first.question.id)} className="self-start text-sm font-bold text-brand hover:underline">
-                        {complete ? 'Ver respostas' : 'Responder'}{' '}<span className="sr-only">de {section.name}</span> <span aria-hidden>→</span>
+                        {complete ? 'Ver respostas' : 'Responder'}{' '}<span className="sr-only">de {section.name}</span>
                       </Link>
                     )}
                   </div>
