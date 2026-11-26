@@ -202,7 +202,11 @@ class AssessmentService(
                 "coverage" to evaluation.coverage,
             ),
         )
-        events.publishEvent(AssessmentEvaluated(tenant, correlation.current(), id, now))
+        events.publishEvent(
+            AssessmentEvaluated(
+                tenant, correlation.current(), id, assessment.framework, assessment.catalogueVersion, now,
+            ),
+        )
         return toSummary(assessment, progress)
     }
 

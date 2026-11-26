@@ -205,6 +205,8 @@ class SubmitAssessmentTest {
         assertThat(evaluated).hasSize(1)
         assertThat(submitted.single().tenantId.value).isEqualTo(tenant)
         assertThat(evaluated.single().correlationId).isEqualTo(submitted.single().correlationId)
+        assertThat(evaluated.single().framework).isEqualTo("nis2-qnrcs")
+        assertThat(evaluated.single().catalogueVersion).isEqualTo(2)
     }
 
     @Test

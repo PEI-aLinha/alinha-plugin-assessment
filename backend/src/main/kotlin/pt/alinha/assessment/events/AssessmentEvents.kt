@@ -18,10 +18,15 @@ data class AssessmentSubmitted(
     override val occurredAt: Instant = Instant.now(),
 ) : DomainEvent
 
-/** The Compliance Engine computed the assessment's results; they wait for the consultant (assessment#8). */
+/**
+ * The Compliance Engine computed the assessment's results; they wait for the consultant (assessment#8). The
+ * framework and catalogue version let a listener (dashboard-reports) group results without reading them back.
+ */
 data class AssessmentEvaluated(
     override val tenantId: TenantId,
     override val correlationId: UUID,
     val assessmentId: UUID,
+    val framework: String,
+    val catalogueVersion: Int,
     override val occurredAt: Instant = Instant.now(),
 ) : DomainEvent
