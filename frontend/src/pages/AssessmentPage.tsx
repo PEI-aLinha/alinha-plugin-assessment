@@ -122,6 +122,7 @@ function SectionsTable({ questionnaire, questionLink }: { questionnaire: Questio
             const isOpen = expanded === section.id
             const panel = `section-${section.id}`
             const first = resumeStep(questionnaire, section.id)
+            const missing = section.total - section.answered
             return (
               <li key={section.id} className="border-b border-line-soft last:border-b-0">
                 <button type="button" onClick={() => setExpanded(isOpen ? null : section.id)} aria-expanded={isOpen} aria-controls={panel}
@@ -130,6 +131,7 @@ function SectionsTable({ questionnaire, questionLink }: { questionnaire: Questio
                     ? <CheckCircle2 className="size-4 shrink-0 text-brand" role="img" aria-label="Completa" />
                     : <Clock className="size-4 shrink-0 text-muted" role="img" aria-label="Por completar" />}
                   {' '}<span className="min-w-0 flex-1 text-sm font-bold">{section.name}</span>
+                  {!complete && <>{' '}<span className="shrink-0 text-sm font-semibold text-ink-soft max-sm:hidden">{missing} por responder</span></>}
                   {' '}<span className="w-12 shrink-0 text-right text-sm font-semibold">{section.answered}/{section.total}</span>
                   <ChevronDown className={cn('size-4 shrink-0 text-ink-soft transition-transform', isOpen && 'rotate-180')} aria-hidden />
                 </button>
@@ -138,7 +140,7 @@ function SectionsTable({ questionnaire, questionLink }: { questionnaire: Questio
                     <ProgressBar value={section.answered} max={section.total} label={`Progresso de ${section.name}`} />
                     {first && (
                       <Link to={questionLink(first.question.id)} className="self-start text-sm font-bold text-brand hover:underline">
-                        {complete ? 'Ver respostas' : 'Responder'}{' '}<span className="sr-only">de {section.name}</span>
+                        {complete ? 'Ver respostas' : missing === 1 ? 'Responder à pergunta que falta' : `Responder às ${missing} que faltam`}{' '}<span className="sr-only">de {section.name}</span>
                       </Link>
                     )}
                   </div>
