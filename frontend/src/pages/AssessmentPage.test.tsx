@@ -276,6 +276,27 @@ describe('AssessmentPage submit', () => {
     expect(screen.getByRole('button', { name: 'Submeter avaliação' })).toBeInTheDocument()
   })
 
+  it('reloads the assessment when the submit fails, so an assessment submitted elsewhere shows as frozen', async () => {
+    let status: 'draft' | 'evaluated' = 'draft'
+    const calls = fakeApi({
+      [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage([complete()]),
+      [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => ({ ...complete(), status }),
+      [`POST ${submitPath(ASSESSMENT_ID)}`]: () => {
+        status = 'evaluated'
+        throw new ApiError(409, submitPath(ASSESSMENT_ID), undefined, {
+          code: 'ASSESSMENT_NOT_EDITABLE', detail: 'A avaliação já foi submetida.',
+        })
+      },
+    })
+    renderAt(BASE, { host: { api: calls } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Submeter avaliação' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submeter' }))
+
+    expect(await screen.findByText('A avaliação já foi submetida. As respostas já não podem ser alteradas.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Submeter avaliação' })).not.toBeInTheDocument()
+  })
+
   it('tells someone who cannot submit who does it', async () => {
     renderAt(BASE, { host: { api: api(), can: (resource, action) => !(resource === 'assessment' && action === 'submit') } })
 
