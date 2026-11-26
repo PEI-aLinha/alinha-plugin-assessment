@@ -65,7 +65,7 @@ class AssessmentService(
     @Transactional
     fun start(framework: String): AssessmentDetail {
         if (!FRAMEWORK_ID.matches(framework)) throw InvalidFrameworkException(framework)
-        val scope = applicability.current(tenants.current()) ?: throw ScopeNotAnsweredException()
+        val scope = applicability.current() ?: throw ScopeNotAnsweredException()
         val resolved = ScopeRules.resolve(framework, scope)
         val catalogue = catalogues.latest(framework) ?: throw CatalogueNotFoundException(framework)
         openAssessment(framework)?.let { throw AssessmentAlreadyOpenException(it) }
