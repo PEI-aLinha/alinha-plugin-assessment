@@ -67,6 +67,7 @@ class AssessmentService(
     private val tenants: TenantContext,
     private val correlation: CorrelationContext,
     private val events: ApplicationEventPublisher,
+    private val roadmaps: RoadmapService,
     transactionManager: PlatformTransactionManager,
 ) {
     /** Reads the winner of a concurrent start: the current transaction is already broken by then. */
@@ -153,8 +154,9 @@ class AssessmentService(
 
     /**
      * Freezes the answers and has the Compliance Engine compute the results (assessment#5, FR10): draft -> submitted
-     * -> evaluated in this one transaction, each step audited (RNF04) and published as an event. The row lock makes
-     * a concurrent answer or second submit wait, and then fail on the status.
+     * -> evaluated in this one transaction, each step audited (RNF04) and published as an event. The remediation
+     * roadmap is planned in the same transaction (assessment#6). The row lock makes a concurrent answer or second
+     * submit wait, and then fail on the status.
      */
     @Transactional
     fun submit(id: UUID): AssessmentSummary {
@@ -192,6 +194,7 @@ class AssessmentService(
                 evaluatedAt = now,
             ),
         )
+        roadmaps.plan(id, questionnaire.catalogue, evaluation, now)
         assessment.moveTo(AssessmentStatus.EVALUATED, now)
         audit.record(
             "assessment.evaluated", ENTITY_TYPE, id.toString(),

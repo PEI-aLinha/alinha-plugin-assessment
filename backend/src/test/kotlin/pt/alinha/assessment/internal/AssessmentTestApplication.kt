@@ -49,7 +49,8 @@ import pt.alinha.core.tenant.internal.TenantWebConfig
     HibernateTenantResolver::class, CorrelationIdFilter::class, ScopedCorrelationContext::class,
     AuditActor::class, JpaAuditTrail::class,
     CatalogueRegistry::class, ApplicabilityRules::class, ControlRules::class,
-    AssessmentPlugin::class, AssessmentService::class, AssessmentController::class, AssessmentProblems::class,
+    AssessmentPlugin::class, AssessmentService::class, RoadmapService::class, AssessmentController::class,
+    AssessmentProblems::class,
 )
 class AssessmentTestApplication {
     @Bean

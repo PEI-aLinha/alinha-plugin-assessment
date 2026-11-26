@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import pt.alinha.assessment.events.AssessmentEvaluated
 import pt.alinha.assessment.events.AssessmentSubmitted
+import pt.alinha.assessment.internal.domain.RoadmapRules
 import pt.alinha.core.compliance.ControlRules
 import java.util.UUID
 
@@ -127,6 +128,77 @@ class SubmitAssessmentTest {
         assertThat(submitted["questions"]).isEqualTo("3")
     }
 
+    private fun roadmapActions(id: String): List<Map<String, Any?>> = jdbc.queryForList(
+        """select a.position, a.control_id, a.title, a.priority, a.owner, a.due_on::text as due_on,
+                  a.legal_references::text as legal_references, a.evidence::text as evidence,
+                  r.rules_version, r.generated_at::date::text as generated_on
+           from assessment.roadmap r join assessment.roadmap_action a on a.roadmap_id = r.id
+           where r.assessment_id = ?::uuid order by a.position""",
+        id,
+    )
+
+    private fun roadmapCount(id: String): Int =
+        jdbc.queryForObject("select count(*) from assessment.roadmap where assessment_id = ?::uuid", Int::class.java, id)!!
+
+    @Test
+    fun `submit plans one roadmap action per control that is not compliant, and audits it`() {
+        val id = answeredAll()
+        submit(id).andExpect { status { isOk() } }
+
+        val actions = roadmapActions(id)
+        assertThat(actions).hasSize(1)
+        val action = actions.single()
+        assertThat(action["control_id"]).isEqualTo("CTRL-B")
+        assertThat(action["title"]).isEqualTo("Substantial control")
+        assertThat(action["priority"]).isEqualTo("LOW")
+        assertThat(action["owner"]).isEqualTo("RESPONSIBLE")
+        assertThat(action["legal_references"]).isEqualTo("""["Test reference 1"]""")
+        assertThat(action["evidence"]).isEqualTo("""["Evidence B."]""")
+        assertThat(action["rules_version"]).isEqualTo(RoadmapRules.VERSION)
+        val generatedOn = java.time.LocalDate.parse(action["generated_on"] as String)
+        assertThat(action["due_on"]).isEqualTo(generatedOn.plusDays(180).toString())
+
+        val audited = jdbc.queryForMap(
+            """select entity_type, details->>'assessmentId' as assessment, details->>'actions' as actions
+               from audit.audit_event where action = 'roadmap.generate' and details->>'assessmentId' = ?""",
+            id,
+        )
+        assertThat(audited["entity_type"]).isEqualTo("roadmap")
+        assertThat(audited["actions"]).isEqualTo("1")
+
+        val tenants = jdbc.queryForList(
+            """select r.tenant_id from assessment.roadmap r where r.assessment_id = ?::uuid
+               union select a.tenant_id from assessment.roadmap_action a
+                     join assessment.roadmap r on r.id = a.roadmap_id where r.assessment_id = ?::uuid""",
+            UUID::class.java, id, id,
+        )
+        assertThat(tenants).containsExactly(tenant)
+    }
+
+    @Test
+    fun `a gap in a basic control is the first and most urgent action`() {
+        val id = started()
+        answer(id, "CTRL-A-Q1", "no")
+        answer(id, "CTRL-B-Q1", "partial")
+        answer(id, "CTRL-D-Q1", "yes")
+        submit(id).andExpect { status { isOk() } }
+
+        assertThat(roadmapActions(id).map { it["control_id"] to it["priority"] })
+            .containsExactly("CTRL-A" to "HIGH", "CTRL-B" to "LOW")
+    }
+
+    @Test
+    fun `a fully compliant assessment gets an empty roadmap`() {
+        val id = started()
+        answer(id, "CTRL-A-Q1", "yes")
+        answer(id, "CTRL-B-Q1", "yes")
+        answer(id, "CTRL-D-Q1", "yes")
+        submit(id).andExpect { status { isOk() } }
+
+        assertThat(roadmapCount(id)).isEqualTo(1)
+        assertThat(roadmapActions(id)).isEmpty()
+    }
+
     @Test
     fun `the results store level ids of the catalogue's scale, not enum names`() {
         val id = answeredAll()
@@ -221,6 +293,7 @@ class SubmitAssessmentTest {
         }
         assertThat(status(id)).isEqualTo("DRAFT")
         assertThat(auditActions(id)).doesNotContain("assessment.submitted", "assessment.evaluated")
+        assertThat(roadmapCount(id)).isZero()
         assertThat(events.stream(AssessmentSubmitted::class.java).filter { it.assessmentId.toString() == id }).isEmpty()
     }
 
