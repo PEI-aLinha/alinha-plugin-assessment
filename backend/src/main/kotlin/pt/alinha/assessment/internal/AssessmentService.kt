@@ -21,6 +21,8 @@ import pt.alinha.assessment.internal.persistence.AssessmentRepository
 import pt.alinha.assessment.internal.persistence.ResultEntity
 import pt.alinha.assessment.internal.persistence.ResultRepository
 import pt.alinha.assessment.internal.persistence.StoredControl
+import pt.alinha.assessment.internal.persistence.complianceLevel
+import pt.alinha.assessment.internal.persistence.levelId
 import pt.alinha.core.audit.AuditTrail
 import pt.alinha.core.compliance.Answer
 import pt.alinha.core.compliance.ApplicabilityInput
@@ -181,11 +183,11 @@ class AssessmentService(
                 id = UUID.randomUUID(),
                 assessmentId = id,
                 engineVersion = evaluation.engineVersion,
-                currentLevel = evaluation.currentLevel,
-                targetLevel = evaluation.targetLevel,
+                currentLevel = evaluation.currentLevel?.levelId,
+                targetLevel = evaluation.targetLevel.levelId,
                 coverage = evaluation.coverage,
                 controls = json.writeValueAsString(
-                    evaluation.controls.map { StoredControl(it.controlId, it.level.name, it.status.name) },
+                    evaluation.controls.map { StoredControl(it.controlId, it.level.levelId, it.status.name) },
                 ),
                 evaluatedAt = now,
             ),
@@ -195,8 +197,8 @@ class AssessmentService(
             "assessment.evaluated", ENTITY_TYPE, id.toString(),
             mapOf(
                 "engineVersion" to evaluation.engineVersion,
-                "currentLevel" to evaluation.currentLevel?.name,
-                "targetLevel" to evaluation.targetLevel.name,
+                "currentLevel" to evaluation.currentLevel?.levelId,
+                "targetLevel" to evaluation.targetLevel.levelId,
                 "coverage" to evaluation.coverage,
             ),
         )
@@ -217,7 +219,7 @@ class AssessmentService(
             ControlResult(
                 controlId = it.controlId,
                 title = titles[it.controlId] ?: it.controlId,
-                level = ComplianceLevel.valueOf(it.level),
+                level = complianceLevel(it.level),
                 status = ControlStatus.valueOf(it.status),
             )
         }
@@ -225,8 +227,8 @@ class AssessmentService(
             assessmentId = id,
             evaluatedAt = result.evaluatedAt,
             engineVersion = result.engineVersion,
-            currentLevel = result.currentLevel,
-            targetLevel = result.targetLevel,
+            currentLevel = result.currentLevel?.let(::complianceLevel),
+            targetLevel = complianceLevel(result.targetLevel),
             coverage = result.coverage,
             controls = controls,
         )

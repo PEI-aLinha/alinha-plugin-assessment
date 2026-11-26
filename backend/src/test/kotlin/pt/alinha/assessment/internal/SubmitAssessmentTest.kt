@@ -117,7 +117,7 @@ class SubmitAssessmentTest {
             id,
         )
         assertThat(evaluated["engine"]).isEqualTo(ControlRules.VERSION)
-        assertThat(evaluated["level"]).isEqualTo("BASIC")
+        assertThat(evaluated["level"]).isEqualTo("basic")
         val submitted = jdbc.queryForMap(
             """select details->>'answered' as answered, details->>'questions' as questions
                from audit.audit_event where entity_id = ? and action = 'assessment.submitted'""",
@@ -128,12 +128,27 @@ class SubmitAssessmentTest {
     }
 
     @Test
+    fun `the results store level ids of the catalogue's scale, not enum names`() {
+        val id = answeredAll()
+        submit(id).andExpect { status { isOk() } }
+
+        val stored = jdbc.queryForMap(
+            """select current_level, target_level, controls->1->>'level' as control_level
+               from assessment.result where assessment_id = ?::uuid""",
+            id,
+        )
+        assertThat(stored["current_level"]).isEqualTo("basic")
+        assertThat(stored["target_level"]).isEqualTo("substantial")
+        assertThat(stored["control_level"]).isEqualTo("substantial")
+    }
+
+    @Test
     fun `a stored control missing from the questionnaire keeps its id as the title`() {
         val id = answeredAll()
         submit(id).andExpect { status { isOk() } }
         jdbc.update(
             """update assessment.result
-               set controls = controls || '[{"controlId": "CTRL-GONE", "level": "BASIC", "status": "GAP"}]'::jsonb
+               set controls = controls || '[{"controlId": "CTRL-GONE", "level": "basic", "status": "GAP"}]'::jsonb
                where assessment_id = ?::uuid""",
             id,
         )
