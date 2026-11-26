@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { errorMessage, formatDateTime, LOCALE, TIME_ZONE, useHost } from '@alinha/plugin-sdk'
 import { Badge, Button, Card, EmptyState, ErrorState, Eyebrow, PageHeader, RadioGroup, SkeletonRows, useToast } from '@alinha/ui'
@@ -60,8 +60,13 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
   const { question, control } = step
   const editable = assessment.status === 'draft' && can('assessment', 'answer')
   // Leaving the page while a save is on its way would drop a choice still waiting to be sent: wait for it.
-  const [saving, setSaving] = useState(false)
-  const go = (to: string) => navigate(to, { relative: 'path' })
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const saving = saveState === 'saving'
+  const go = (to: string) => void navigate(to, { relative: 'path' })
+  const forward = next ? sibling(next) : OVERVIEW
+  useHoldWhileSaving(saveState)
+  // Enter is "Seguinte" (or "Terminar"), except on a focused button or link, while typing or in a dialog.
+  useAnswerKeys({ enabled: !saving, onEnter: () => go(forward) })
 
   return (
     <Card className="flex flex-col gap-5 px-7 py-6 max-md:px-5">
@@ -73,30 +78,33 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
         <h2 className="text-[1.25rem] font-extrabold leading-snug">{question.text}</h2>
       </div>
 
-      {editable ? <AnswerOptions assessmentId={assessment.id} step={step} saving={saving} onSavingChange={setSaving} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
+      {editable ? <AnswerOptions assessmentId={assessment.id} step={step} saving={saving} onSaveStateChange={setSaveState} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="secondary" disabled={!prev || saving} icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => prev && go(sibling(prev))}>Anterior</Button>
         <div className="flex flex-wrap justify-end gap-2">
           {editable && <Button variant="secondary" disabled={saving} onClick={() => go(OVERVIEW)}>Guardar e continuar depois</Button>}
           {/* After the last question, back to the overview of the sections. */}
-          <Button disabled={saving} onClick={() => go(next ? sibling(next) : OVERVIEW)}>{next ? <>Seguinte<ArrowRight className="size-4" aria-hidden /></> : 'Terminar'}</Button>
+          <Button disabled={saving} onClick={() => go(forward)}>{next ? <>Seguinte<ArrowRight className="size-4" aria-hidden /></> : 'Terminar'}</Button>
         </div>
       </div>
     </Card>
   )
 }
 
+/** `failed`: nothing is on its way and the last save failed (the choice went back to the server's answer). */
+type SaveState = 'idle' | 'saving' | 'failed'
+
 /**
  * The options, saved as soon as one is chosen. Saves go one at a time and the last choice always wins: a choice
  * made while a save is on its way is sent when that one ends. A failed save shows an error and goes back to the
- * answer the server has. The page keeps `saving` so it can hold navigation until the last choice is saved.
+ * answer the server has. The page keeps the save state so it can hold navigation until the last choice is saved.
  */
-function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }: {
+function AnswerOptions({ assessmentId, step, saving, onSaveStateChange: setSaveState }: {
   assessmentId: string
   step: Step
   saving: boolean
-  onSavingChange: (saving: boolean) => void
+  onSaveStateChange: (state: SaveState) => void
 }) {
   const toast = useToast()
   const save = useSaveAnswer(assessmentId)
@@ -109,13 +117,15 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
 
   const send = (answer: AnswerValue) => {
     inFlight.current = true
-    setSaving(true)
+    setSaveState('saving')
+    let failed = false
     save.mutateAsync({ questionId: question.id, answer })
       .then((saved) => {
         serverAnswer.current = saved.answer
         setSavedAt(saved.answeredAt)
       })
       .catch((error: unknown) => {
+        failed = true
         toast.show(errorMessage(error), 'error')
         wanted.current = serverAnswer.current
         setChoice(serverAnswer.current)
@@ -123,7 +133,7 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
       .finally(() => {
         inFlight.current = false
         if (wanted.current !== null && wanted.current !== serverAnswer.current) send(wanted.current)
-        else setSaving(false)
+        else setSaveState(failed ? 'failed' : 'idle')
       })
   }
 
@@ -132,11 +142,24 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
     wanted.current = answer
     if (!inFlight.current && answer !== serverAnswer.current) send(answer)
   }
+  // The digit keys pick the options in the order they are shown, as many as there are (at most 4 today).
+  useAnswerKeys({
+    enabled: true,
+    onDigit: (n) => {
+      const option = question.options[n - 1]
+      if (!option) return
+      choose(option)
+      document.querySelector<HTMLInputElement>(`input[name="resposta"][value="${option}"]`)?.focus()
+    },
+  })
 
   return (
     <div className="flex flex-col gap-2">
       <RadioGroup name="resposta" legend="A sua resposta" value={choice} onChange={choose} columns={2}
         options={question.options.map((o) => ({ value: o, label: ANSWER_LABEL[o], hint: ANSWER_HINT[o] }))} />
+      {question.options.length > 1 && (
+        <p className="text-[0.75rem] text-muted max-md:hidden">Pelo teclado: 1 a {question.options.length} escolhem a resposta, Enter passa à seguinte.</p>
+      )}
       {/* Always rendered, so screen readers announce it when a save fills it in. */}
       <p role="status" className="flex min-h-5 items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-soft">
         {saving ? 'A guardar…' : savedAt && <><Check className="size-4 text-signal" aria-hidden />Resposta guardada às {timeOf(savedAt)}</>}
@@ -144,6 +167,63 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
     </div>
   )
 }
+
+/**
+ * Holds any move away from the question (sidebar, a link, the browser's back button) until the last choice is
+ * saved, then lets it through: a choice still on its way is not lost. When that save fails, the move is cancelled
+ * so the person stays and sees the error and the answer that is really saved. Closing the tab cannot wait, so the
+ * browser asks first.
+ */
+function useHoldWhileSaving(state: SaveState) {
+  const saving = state === 'saving'
+  const blocker = useBlocker(saving)
+  useEffect(() => {
+    if (blocker.state !== 'blocked' || saving) return
+    if (state === 'failed') blocker.reset()
+    else blocker.proceed()
+  }, [blocker, saving, state])
+  useEffect(() => {
+    if (!saving) return undefined
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [saving])
+}
+
+/**
+ * Keyboard shortcuts of the question page. Ignored with a modifier, when a held key repeats (a held Enter would skip
+ * question after question), while typing, and while a dialog is open.
+ */
+function useAnswerKeys({ enabled, onDigit, onEnter }: { enabled: boolean; onDigit?: (n: number) => void; onEnter?: () => void }) {
+  const handlers = useRef({ onDigit, onEnter })
+  useLayoutEffect(() => { handlers.current = { onDigit, onEnter } })
+  useEffect(() => {
+    if (!enabled) return undefined
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      const target = e.target instanceof HTMLElement ? e.target : null
+      if (target?.closest('textarea, input:not([type="radio"]), select, [contenteditable="true"]')) return
+      if (dialogOpen()) return
+      const { onDigit: digit, onEnter: enter } = handlers.current
+      if (e.key === 'Enter' && enter) {
+        // A focused button or link keeps its own Enter.
+        if (target?.closest('button, a')) return
+        e.preventDefault()
+        enter()
+      } else if (/^[1-9]$/.test(e.key) && digit) {
+        e.preventDefault()
+        digit(Number(e.key))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [enabled])
+}
+
+/** A dialog someone can see: one kept mounted but hidden (or hidden from assistive tech) does not count. */
+const dialogOpen = () =>
+  [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="alertdialog"]')]
+    .some((el) => !el.closest('[hidden], [aria-hidden="true"]'))
 
 function ReadOnlyAnswer({ answer, answeredAt }: { answer: AnswerValue | null; answeredAt: string | null }) {
   return (

@@ -103,6 +103,157 @@ describe('QuestionPage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'ID.GA-1-B-Q1')))
   })
 
+  it('holds a move away from the page until the last choice is saved', async () => {
+    let release: () => void = () => {}
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    const fn = api(assessmentDetail(), async (id, answer) => { await pending; return saved(id, answer) })
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Sim/ }))
+    await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
+    await act(async () => { await router.navigate(BASE) })
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+
+    await act(async () => { release() })
+    await waitFor(() => expect(router.state.location.pathname).toBe(BASE))
+  })
+
+  it('cancels a held move when the save fails, so the error and the saved answer stay in view', async () => {
+    let reject: (error: unknown) => void = () => {}
+    const pending = new Promise<never>((_, fail) => { reject = fail })
+    const fn = api(assessmentDetail(), async () => pending)
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'), { host: { api: fn } })
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Não(?! sei)/ }))
+    await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
+    await act(async () => { await router.navigate(BASE) })
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'))
+
+    await act(async () => {
+      reject(new ApiError(409, 'x', undefined, { code: 'ASSESSMENT_NOT_EDITABLE', detail: 'A avaliação já foi submetida.' }))
+    })
+
+    expect(await screen.findByText('A avaliação já foi submetida.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('radio', { name: /^Sim/ })).toBeChecked())
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'))
+    // Moving again goes through: nothing is on its way any more.
+    await act(async () => { await router.navigate(BASE) })
+    await waitFor(() => expect(router.state.location.pathname).toBe(BASE))
+  })
+
+  it('asks before closing the tab only while a save is on its way', async () => {
+    let release: () => void = () => {}
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    const fn = api(assessmentDetail(), async (id, answer) => { await pending; return saved(id, answer) })
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    const closing = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Sim/ }))
+    await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
+    expect(closing()).toBe(true)
+
+    await act(async () => { release() })
+    await screen.findByText(/Resposta guardada às/)
+    expect(closing()).toBe(false)
+  })
+
+  it('answers with keys 1 to 4 and goes on with Enter', async () => {
+    const fn = api()
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+    expect(screen.getByText(/Pelo teclado: 1 a 4 escolhem a resposta/)).toBeInTheDocument()
+
+    fireEvent.keyDown(document.body, { key: '2' })
+    expect(screen.getByRole('radio', { name: /^Em parte/ })).toBeChecked()
+    await waitFor(() => expect(putCalls(fn)).toEqual([[answerPath(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), 'partial']]))
+    await screen.findByText(/Resposta guardada/)
+
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    await waitFor(() => expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'ID.GA-1-B-Q1')))
+  })
+
+  it('leaves Enter to a focused button and ignores keys with a modifier', async () => {
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: api() } })
+    const previous = await screen.findByRole('button', { name: 'Anterior' })
+
+    fireEvent.keyDown(previous, { key: 'Enter' })
+    fireEvent.keyDown(document.body, { key: '1', ctrlKey: true })
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+    expect(screen.getByRole('radio', { name: /^Sim/ })).not.toBeChecked()
+  })
+
+  it('ignores a held key, so a held Enter does not skip question after question', async () => {
+    const fn = api()
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+
+    fireEvent.keyDown(document.body, { key: '1', repeat: true })
+    fireEvent.keyDown(document.body, { key: 'Enter', repeat: true })
+
+    expect(screen.getByRole('radio', { name: /^Sim/ })).not.toBeChecked()
+    expect(putCalls(fn)).toEqual([])
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+  })
+
+  it('ignores the keys while a dialog is open', async () => {
+    const fn = api()
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+    const dialog = document.body.appendChild(document.createElement('div'))
+    dialog.setAttribute('role', 'dialog')
+
+    fireEvent.keyDown(document.body, { key: '1' })
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+
+    expect(screen.getByRole('radio', { name: /^Sim/ })).not.toBeChecked()
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+    dialog.remove()
+  })
+
+  it('keeps the keys when a dialog is only mounted, hidden', async () => {
+    const fn = api()
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+    const hidden = document.body.appendChild(document.createElement('div'))
+    hidden.hidden = true
+    hidden.appendChild(document.createElement('div')).setAttribute('role', 'dialog')
+
+    fireEvent.keyDown(document.body, { key: '1' })
+
+    expect(screen.getByRole('radio', { name: /^Sim/ })).toBeChecked()
+    hidden.remove()
+  })
+
+  it('does not offer the keys for a single option', async () => {
+    const detail = assessmentDetail()
+    const [first] = detail.controls
+    const one = { ...first, questions: first.questions.map((q) => q.id === 'GR.CO-3-B-Q2' ? { ...q, options: ['yes'] as AnswerValue[] } : q) }
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: api({ ...detail, controls: [one, ...detail.controls.slice(1)] }) } })
+
+    await screen.findByRole('radio', { name: /^Sim/ })
+    expect(screen.queryByText(/Pelo teclado/)).not.toBeInTheDocument()
+  })
+
+  it('only takes the digits of the options a question has', async () => {
+    const detail = assessmentDetail()
+    const [first] = detail.controls
+    const three = { ...first, questions: first.questions.map((q) => q.id === 'GR.CO-3-B-Q2' ? { ...q, options: ['yes', 'no', 'unknown'] as AnswerValue[] } : q) }
+    const fn = api({ ...detail, controls: [three, ...detail.controls.slice(1)] })
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Sim/ })
+    expect(screen.getByText(/Pelo teclado: 1 a 3 escolhem a resposta/)).toBeInTheDocument()
+
+    fireEvent.keyDown(document.body, { key: '4' })
+    expect(putCalls(fn)).toEqual([])
+
+    fireEvent.keyDown(document.body, { key: '3' })
+    await waitFor(() => expect(putCalls(fn)).toEqual([[answerPath(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), 'unknown']]))
+  })
+
   it('goes back to the saved answer when a save fails', async () => {
     const fn = api(assessmentDetail(), async () => { throw new ApiError(409, 'x', undefined, { code: 'ASSESSMENT_NOT_EDITABLE', detail: 'A avaliação já foi submetida.' }) })
     renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'), { host: { api: fn } })

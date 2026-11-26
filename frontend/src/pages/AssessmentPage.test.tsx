@@ -35,7 +35,7 @@ describe('AssessmentPage with an assessment', () => {
     expect(screen.queryByRole('list', { name: 'Secções da avaliação' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Perguntas por secção/ }))
     const sections = within(screen.getByRole('list', { name: 'Secções da avaliação' })).getAllByRole('button')
-    expect(sections.map((b) => b.textContent?.trim())).toEqual(['Governação 1/2', 'Identificar 0/2', 'Proteger 0/1'])
+    expect(sections.map((b) => b.textContent?.trim())).toEqual(['Governação 1 por responder 1/2', 'Identificar 2 por responder 0/2', 'Proteger 1 por responder 0/1'])
     expect(screen.getByText('3 secções · 5 perguntas')).toBeInTheDocument()
   })
 
@@ -53,9 +53,20 @@ describe('AssessmentPage with an assessment', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Perguntas por secção/ }))
     fireEvent.click(screen.getByRole('button', { name: /Proteger/ }))
     expect(screen.getByRole('progressbar', { name: 'Progresso de Proteger' })).toHaveAttribute('aria-valuenow', '0')
-    fireEvent.click(screen.getByRole('link', { name: /^Responder de Proteger/ }))
+    expect(screen.getByRole('button', { name: /Proteger.*1 por responder/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: /^Responder à pergunta que falta de Proteger/ }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`${BASE}/${ASSESSMENT_ID}/questions/PR.GA-3-B-Q1`))
+  })
+
+  it('says how many questions a section has left', async () => {
+    const { router } = renderAt(BASE, { host: { api: api() } })
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Perguntas por secção/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Identificar/ }))
+    fireEvent.click(screen.getByRole('link', { name: 'Responder às 2 que faltam de Identificar' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`${BASE}/${ASSESSMENT_ID}/questions/ID.GA-1-B-Q1`))
   })
 
   it('says when the assessment was submitted and only offers to see the answers', async () => {
