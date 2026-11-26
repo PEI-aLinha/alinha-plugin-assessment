@@ -24,6 +24,7 @@ import pt.alinha.core.audit.internal.JpaAuditTrail
 import pt.alinha.core.compliance.ApplicabilityRules
 import pt.alinha.core.compliance.CatalogueRegistry
 import pt.alinha.core.registry.PluginRegistry
+import pt.alinha.core.tenant.TenantContext
 import pt.alinha.core.tenant.internal.CorrelationIdFilter
 import pt.alinha.core.tenant.internal.HibernateTenantResolver
 import pt.alinha.core.tenant.internal.JwtTenantContext
@@ -53,7 +54,8 @@ import tools.jackson.databind.json.JsonMapper
 )
 class AssessmentTestApplication {
     @Bean
-    fun fakeApplicabilityQuery(rules: ApplicabilityRules, json: JsonMapper) = FakeApplicabilityQuery(rules, json)
+    fun fakeApplicabilityQuery(rules: ApplicabilityRules, json: JsonMapper, tenants: TenantContext) =
+        FakeApplicabilityQuery(rules, json, tenants)
 
     @Bean
     @Primary
