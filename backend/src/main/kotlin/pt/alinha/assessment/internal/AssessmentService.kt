@@ -168,8 +168,12 @@ class AssessmentService(
 
         val now = now()
         val tenant = tenants.current()
+        val progress = progress(saved.keys, questionnaire)
         assessment.moveTo(AssessmentStatus.SUBMITTED, now)
-        audit.record("assessment.submitted", ENTITY_TYPE, id.toString(), mapOf("answered" to questionnaire.questionCount))
+        audit.record(
+            "assessment.submitted", ENTITY_TYPE, id.toString(),
+            mapOf("answered" to progress.answered, "questions" to progress.total),
+        )
         events.publishEvent(AssessmentSubmitted(tenant, correlation.current(), id, now))
 
         results.save(
@@ -197,10 +201,13 @@ class AssessmentService(
             ),
         )
         events.publishEvent(AssessmentEvaluated(tenant, correlation.current(), id, now))
-        return toSummary(assessment, progress(saved.keys, questionnaire))
+        return toSummary(assessment, progress)
     }
 
-    /** The stored results, with the control titles from the assessment's pinned catalogue version. */
+    /**
+     * The stored results, with the control titles from the assessment's pinned catalogue version. A stored control
+     * that is not in the questionnaire keeps its id as the title, rather than failing the whole page.
+     */
     @Transactional(readOnly = true)
     fun results(id: UUID): AssessmentResults {
         val assessment = assessments.findOneById(id) ?: throw AssessmentNotFoundException()
@@ -209,7 +216,7 @@ class AssessmentService(
         val controls = json.readValue(result.controls, Array<StoredControl>::class.java).map {
             ControlResult(
                 controlId = it.controlId,
-                title = titles.getValue(it.controlId),
+                title = titles[it.controlId] ?: it.controlId,
                 level = ComplianceLevel.valueOf(it.level),
                 status = ControlStatus.valueOf(it.status),
             )

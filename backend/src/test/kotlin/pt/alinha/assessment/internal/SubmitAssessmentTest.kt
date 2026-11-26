@@ -118,6 +118,31 @@ class SubmitAssessmentTest {
         )
         assertThat(evaluated["engine"]).isEqualTo(ControlRules.VERSION)
         assertThat(evaluated["level"]).isEqualTo("BASIC")
+        val submitted = jdbc.queryForMap(
+            """select details->>'answered' as answered, details->>'questions' as questions
+               from audit.audit_event where entity_id = ? and action = 'assessment.submitted'""",
+            id,
+        )
+        assertThat(submitted["answered"]).isEqualTo("3")
+        assertThat(submitted["questions"]).isEqualTo("3")
+    }
+
+    @Test
+    fun `a stored control missing from the questionnaire keeps its id as the title`() {
+        val id = answeredAll()
+        submit(id).andExpect { status { isOk() } }
+        jdbc.update(
+            """update assessment.result
+               set controls = controls || '[{"controlId": "CTRL-GONE", "level": "BASIC", "status": "GAP"}]'::jsonb
+               where assessment_id = ?::uuid""",
+            id,
+        )
+
+        results(id).andExpect {
+            status { isOk() }
+            jsonPath("$.controls[3].controlId") { value("CTRL-GONE") }
+            jsonPath("$.controls[3].title") { value("CTRL-GONE") }
+        }
     }
 
     @Test
