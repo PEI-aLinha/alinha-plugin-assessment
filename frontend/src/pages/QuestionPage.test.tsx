@@ -118,6 +118,49 @@ describe('QuestionPage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(BASE))
   })
 
+  it('cancels a held move when the save fails, so the error and the saved answer stay in view', async () => {
+    let reject: (error: unknown) => void = () => {}
+    const pending = new Promise<never>((_, fail) => { reject = fail })
+    const fn = api(assessmentDetail(), async () => pending)
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'), { host: { api: fn } })
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Não(?! sei)/ }))
+    await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
+    await act(async () => { await router.navigate(BASE) })
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'))
+
+    await act(async () => {
+      reject(new ApiError(409, 'x', undefined, { code: 'ASSESSMENT_NOT_EDITABLE', detail: 'A avaliação já foi submetida.' }))
+    })
+
+    expect(await screen.findByText('A avaliação já foi submetida.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('radio', { name: /^Sim/ })).toBeChecked())
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'))
+    // Moving again goes through: nothing is on its way any more.
+    await act(async () => { await router.navigate(BASE) })
+    await waitFor(() => expect(router.state.location.pathname).toBe(BASE))
+  })
+
+  it('asks before closing the tab only while a save is on its way', async () => {
+    let release: () => void = () => {}
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    const fn = api(assessmentDetail(), async (id, answer) => { await pending; return saved(id, answer) })
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    const closing = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Sim/ }))
+    await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
+    expect(closing()).toBe(true)
+
+    await act(async () => { release() })
+    await screen.findByText(/Resposta guardada às/)
+    expect(closing()).toBe(false)
+  })
+
   it('answers with keys 1 to 4 and goes on with Enter', async () => {
     const fn = api()
     const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })

@@ -60,10 +60,11 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
   const { question, control } = step
   const editable = assessment.status === 'draft' && can('assessment', 'answer')
   // Leaving the page while a save is on its way would drop a choice still waiting to be sent: wait for it.
-  const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const saving = saveState === 'saving'
   const go = (to: string) => void navigate(to, { relative: 'path' })
   const forward = next ? sibling(next) : OVERVIEW
-  useHoldWhileSaving(saving)
+  useHoldWhileSaving(saveState)
   // Enter is "Seguinte" (or "Terminar"), except on a focused button or link, while typing or in a dialog.
   useAnswerKeys({ enabled: !saving, onEnter: () => go(forward) })
 
@@ -77,7 +78,7 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
         <h2 className="text-[1.25rem] font-extrabold leading-snug">{question.text}</h2>
       </div>
 
-      {editable ? <AnswerOptions assessmentId={assessment.id} step={step} saving={saving} onSavingChange={setSaving} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
+      {editable ? <AnswerOptions assessmentId={assessment.id} step={step} saving={saving} onSaveStateChange={setSaveState} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="secondary" disabled={!prev || saving} icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => prev && go(sibling(prev))}>Anterior</Button>
@@ -91,16 +92,19 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
   )
 }
 
+/** `failed`: nothing is on its way and the last save failed (the choice went back to the server's answer). */
+type SaveState = 'idle' | 'saving' | 'failed'
+
 /**
  * The options, saved as soon as one is chosen. Saves go one at a time and the last choice always wins: a choice
  * made while a save is on its way is sent when that one ends. A failed save shows an error and goes back to the
- * answer the server has. The page keeps `saving` so it can hold navigation until the last choice is saved.
+ * answer the server has. The page keeps the save state so it can hold navigation until the last choice is saved.
  */
-function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }: {
+function AnswerOptions({ assessmentId, step, saving, onSaveStateChange: setSaveState }: {
   assessmentId: string
   step: Step
   saving: boolean
-  onSavingChange: (saving: boolean) => void
+  onSaveStateChange: (state: SaveState) => void
 }) {
   const toast = useToast()
   const save = useSaveAnswer(assessmentId)
@@ -113,13 +117,15 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
 
   const send = (answer: AnswerValue) => {
     inFlight.current = true
-    setSaving(true)
+    setSaveState('saving')
+    let failed = false
     save.mutateAsync({ questionId: question.id, answer })
       .then((saved) => {
         serverAnswer.current = saved.answer
         setSavedAt(saved.answeredAt)
       })
       .catch((error: unknown) => {
+        failed = true
         toast.show(errorMessage(error), 'error')
         wanted.current = serverAnswer.current
         setChoice(serverAnswer.current)
@@ -127,7 +133,7 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
       .finally(() => {
         inFlight.current = false
         if (wanted.current !== null && wanted.current !== serverAnswer.current) send(wanted.current)
-        else setSaving(false)
+        else setSaveState(failed ? 'failed' : 'idle')
       })
   }
 
@@ -162,14 +168,18 @@ function AnswerOptions({ assessmentId, step, saving, onSavingChange: setSaving }
 
 /**
  * Holds any move away from the question (sidebar, a link, the browser's back button) until the last choice is
- * saved, then lets it through: a choice still on its way is not lost. Closing the tab cannot wait, so the browser
- * asks first.
+ * saved, then lets it through: a choice still on its way is not lost. When that save fails, the move is cancelled
+ * so the person stays and sees the error and the answer that is really saved. Closing the tab cannot wait, so the
+ * browser asks first.
  */
-function useHoldWhileSaving(saving: boolean) {
+function useHoldWhileSaving(state: SaveState) {
+  const saving = state === 'saving'
   const blocker = useBlocker(saving)
   useEffect(() => {
-    if (blocker.state === 'blocked' && !saving) blocker.proceed()
-  }, [blocker, saving])
+    if (blocker.state !== 'blocked' || saving) return
+    if (state === 'failed') blocker.reset()
+    else blocker.proceed()
+  }, [blocker, saving, state])
   useEffect(() => {
     if (!saving) return undefined
     const warn = (e: BeforeUnloadEvent) => e.preventDefault()
