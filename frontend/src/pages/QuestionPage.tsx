@@ -142,7 +142,7 @@ function AnswerOptions({ assessmentId, step, saving, onSaveStateChange: setSaveS
     wanted.current = answer
     if (!inFlight.current && answer !== serverAnswer.current) send(answer)
   }
-  // Keys 1 to 4 pick the options in the order they are shown.
+  // The digit keys pick the options in the order they are shown, as many as there are (at most 4 today).
   useAnswerKeys({
     enabled: true,
     onDigit: (n) => {
@@ -157,7 +157,9 @@ function AnswerOptions({ assessmentId, step, saving, onSaveStateChange: setSaveS
     <div className="flex flex-col gap-2">
       <RadioGroup name="resposta" legend="A sua resposta" value={choice} onChange={choose} columns={2}
         options={question.options.map((o) => ({ value: o, label: ANSWER_LABEL[o], hint: ANSWER_HINT[o] }))} />
-      <p className="text-[0.75rem] text-muted max-md:hidden">Pelo teclado: 1 a {question.options.length} escolhem a resposta, Enter passa à seguinte.</p>
+      {question.options.length > 1 && (
+        <p className="text-[0.75rem] text-muted max-md:hidden">Pelo teclado: 1 a {question.options.length} escolhem a resposta, Enter passa à seguinte.</p>
+      )}
       {/* Always rendered, so screen readers announce it when a save fills it in. */}
       <p role="status" className="flex min-h-5 items-center gap-1.5 text-[0.8125rem] font-semibold text-ink-soft">
         {saving ? 'A guardar…' : savedAt && <><Check className="size-4 text-signal" aria-hidden />Resposta guardada às {timeOf(savedAt)}</>}
@@ -201,14 +203,14 @@ function useAnswerKeys({ enabled, onDigit, onEnter }: { enabled: boolean; onDigi
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
       const target = e.target instanceof HTMLElement ? e.target : null
       if (target?.closest('textarea, input:not([type="radio"]), select, [contenteditable="true"]')) return
-      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
+      if (dialogOpen()) return
       const { onDigit: digit, onEnter: enter } = handlers.current
       if (e.key === 'Enter' && enter) {
         // A focused button or link keeps its own Enter.
         if (target?.closest('button, a')) return
         e.preventDefault()
         enter()
-      } else if (/^[1-4]$/.test(e.key) && digit) {
+      } else if (/^[1-9]$/.test(e.key) && digit) {
         e.preventDefault()
         digit(Number(e.key))
       }
@@ -217,6 +219,11 @@ function useAnswerKeys({ enabled, onDigit, onEnter }: { enabled: boolean; onDigi
     return () => window.removeEventListener('keydown', onKey)
   }, [enabled])
 }
+
+/** A dialog someone can see: one kept mounted but hidden (or hidden from assistive tech) does not count. */
+const dialogOpen = () =>
+  [...document.querySelectorAll<HTMLElement>('[role="dialog"], [role="alertdialog"]')]
+    .some((el) => !el.closest('[hidden], [aria-hidden="true"]'))
 
 function ReadOnlyAnswer({ answer, answeredAt }: { answer: AnswerValue | null; answeredAt: string | null }) {
   return (

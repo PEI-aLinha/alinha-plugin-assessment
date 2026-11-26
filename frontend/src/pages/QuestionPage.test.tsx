@@ -214,6 +214,30 @@ describe('QuestionPage', () => {
     dialog.remove()
   })
 
+  it('keeps the keys when a dialog is only mounted, hidden', async () => {
+    const fn = api()
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+    const hidden = document.body.appendChild(document.createElement('div'))
+    hidden.hidden = true
+    hidden.appendChild(document.createElement('div')).setAttribute('role', 'dialog')
+
+    fireEvent.keyDown(document.body, { key: '1' })
+
+    expect(screen.getByRole('radio', { name: /^Sim/ })).toBeChecked()
+    hidden.remove()
+  })
+
+  it('does not offer the keys for a single option', async () => {
+    const detail = assessmentDetail()
+    const [first] = detail.controls
+    const one = { ...first, questions: first.questions.map((q) => q.id === 'GR.CO-3-B-Q2' ? { ...q, options: ['yes'] as AnswerValue[] } : q) }
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: api({ ...detail, controls: [one, ...detail.controls.slice(1)] }) } })
+
+    await screen.findByRole('radio', { name: /^Sim/ })
+    expect(screen.queryByText(/Pelo teclado/)).not.toBeInTheDocument()
+  })
+
   it('only takes the digits of the options a question has', async () => {
     const detail = assessmentDetail()
     const [first] = detail.controls
