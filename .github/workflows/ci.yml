@@ -19,8 +19,8 @@ jobs:
       plugin-path: plugins/feature/assessment
       gradle-project: assessment
       npm-package: "@alinha/plugin-assessment"
-      # Coordinated change with the main repo's feat/level-scale: back to main once it merges.
-      main-ref: feat/level-scale
+      # Coordinated change with the main repo's feat/23-soc-cmm: back to main once it merges.
+      main-ref: feat/23-soc-cmm
     secrets:
       ALINHA_READ_TOKEN: ${{ secrets.ALINHA_READ_TOKEN }}   # private repos only
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
