@@ -45,6 +45,8 @@ export interface QuestionnaireControl {
 export interface AssessmentDetail extends AssessmentSummary {
   catalogueTitle: string
   nis2Classification: Nis2Classification
+  /** `nis2Classification` is the official CNCS qualification, not the indicative one. */
+  nis2ClassificationOfficial: boolean
   maxLevel: ComplianceLevel
   rulesVersion: string
   controls: QuestionnaireControl[]
@@ -57,17 +59,8 @@ export interface AssessmentPage {
   total: number
 }
 
-export interface ApplicabilityInput {
-  size: { employees: number; annualTurnoverEur: number; annualBalanceSheetEur?: number | null }
-  publicBody?: boolean
-  nis2: { entityTypes?: string[]; criticalEntity?: boolean; significantImpact?: boolean; higherEducation?: boolean }
-  gdpr: { processesPersonalData: boolean }
-  aiAct: { usesAiSystems?: boolean; providesAiSystems?: boolean }
-}
-
 export interface StartAssessmentRequest {
   framework: string
-  scope: ApplicabilityInput
 }
 
 export interface SavedAnswer {

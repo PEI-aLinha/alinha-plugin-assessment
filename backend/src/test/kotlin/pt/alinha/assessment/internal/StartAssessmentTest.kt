@@ -53,6 +53,7 @@ class StartAssessmentTest {
     @Autowired private lateinit var assessments: AssessmentRepository
     @Autowired private lateinit var tenants: TenantContext
     @Autowired private lateinit var tx: TransactionTemplate
+    @Autowired private lateinit var scopes: FakeApplicabilityQuery
 
     private lateinit var sub: String
     private lateinit var tenant: UUID
@@ -63,12 +64,20 @@ class StartAssessmentTest {
         tenant = UUID.randomUUID()
     }
 
-    private fun start(framework: String, scope: String = IMPORTANT_SCOPE): ResultActionsDsl =
-        mvc.post(ASSESSMENTS) {
+    /** The organization answered [scope] in the organization plugin (null: not yet), then starts [framework]. */
+    private fun start(
+        framework: String,
+        scope: String? = IMPORTANT_SCOPE,
+        official: Nis2Classification? = null,
+        body: String = """{"framework": "$framework"}""",
+    ): ResultActionsDsl {
+        if (scope != null) scopes.declare(tenant, scope, official)
+        return mvc.post(ASSESSMENTS) {
             header("Authorization", "Bearer responsible.$sub.$tenant")
             contentType = MediaType.APPLICATION_JSON
-            content = """{"framework": "$framework", "scope": $scope}"""
+            content = body
         }
+    }
 
     private fun idOf(result: ResultActionsDsl): String =
         JsonPath.read(result.andReturn().response.contentAsString, "$.id")
@@ -94,6 +103,7 @@ class StartAssessmentTest {
             jsonPath("$.status") { value("draft") }
             jsonPath("$.catalogueVersion") { value(2) }
             jsonPath("$.nis2Classification") { value("important") }
+            jsonPath("$.nis2ClassificationOfficial") { value(false) }
             jsonPath("$.maxLevel") { value("substantial") }
             jsonPath("$.rulesVersion") { value(ApplicabilityRules.VERSION) }
             jsonPath("$.controls[*].id") { value(contains("CTRL-A", "CTRL-B", "CTRL-D")) }
@@ -116,13 +126,18 @@ class StartAssessmentTest {
         assertThat(audit[0]["has_scope"]).isEqualTo(false)
 
         val scope = jdbc.queryForMap(
-            """select scope_input->'size'->>'employees' as employees,
-                      (scope_input->'nis2'->'entityTypes')::text as types
+            """select scope_input->>'nis2Classification' as classification, scope_input->>'rulesVersion' as rules,
+                      jsonb_exists(scope_input, 'indicative') or jsonb_exists(scope_input, 'effectiveNis2Classification')
+                          as derived,
+                      jsonb_exists(scope_input, 'officialNis2Classification') as has_official
                from assessment.assessment where id = ?::uuid""",
             id,
         )
-        assertThat(scope["employees"]).isEqualTo("120")
-        assertThat(scope["types"]).isEqualTo("""["MACHINERY_MANUFACTURING"]""")
+        // Only the stored facts, not the getters derived from them.
+        assertThat(scope["derived"]).isEqualTo(false)
+        assertThat(scope["has_official"]).isEqualTo(true)
+        assertThat(scope["classification"]).isEqualTo("IMPORTANT")
+        assertThat(scope["rules"]).isEqualTo(ApplicabilityRules.VERSION)
     }
 
     @Test
@@ -184,14 +199,33 @@ class StartAssessmentTest {
     }
 
     @Test
-    fun `contradictory scope answers are a 422`() {
-        val contradictory = """{"size": {"employees": 120, "annualTurnoverEur": 18500000}, "nis2": {},
-            "gdpr": {"processesPersonalData": false, "specialOrCriminalData": true}, "aiAct": {}}"""
-        start("gdpr", contradictory).andExpect {
-            status { isUnprocessableContent() }
-            jsonPath("$.code") { value("VALIDATION_FAILED") }
+    fun `before the scope is answered the start is a 409 and nothing is stored`() {
+        start("nis2-qnrcs", scope = null).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("SCOPE_NOT_ANSWERED") }
         }
         assertThat(rows("assessment.assessment")).isZero()
+        assertThat(rows("audit.audit_event")).isZero()
+    }
+
+    @Test
+    fun `the official CNCS qualification sets the level`() {
+        start("nis2-qnrcs", official = Nis2Classification.ESSENTIAL).andExpect {
+            status { isCreated() }
+            jsonPath("$.nis2Classification") { value("essential") }
+            jsonPath("$.nis2ClassificationOfficial") { value(true) }
+            jsonPath("$.maxLevel") { value("high") }
+        }
+    }
+
+    @Test
+    fun `a scope sent in the body is deprecated and ignored`() {
+        val contradictory = """{"size": {"employees": 120, "annualTurnoverEur": 18500000}, "nis2": {},
+            "gdpr": {"processesPersonalData": false, "specialOrCriminalData": true}, "aiAct": {}}"""
+        start("nis2-qnrcs", body = """{"framework": "nis2-qnrcs", "scope": $contradictory}""").andExpect {
+            status { isCreated() }
+            jsonPath("$.nis2Classification") { value("important") }
+        }
     }
 
     @Test

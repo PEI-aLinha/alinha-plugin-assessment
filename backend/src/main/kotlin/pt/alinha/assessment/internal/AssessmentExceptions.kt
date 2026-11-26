@@ -9,6 +9,9 @@ class FrameworkNotInScopeException(
     val framework: String,
 ) : RuntimeException("Framework $framework does not apply to this organization")
 
+/** The organization has not answered the scope questions (organization plugin) yet: nothing to cut the questions to. */
+class ScopeNotAnsweredException : RuntimeException("The organization has not answered the scope questions yet")
+
 /** The framework id does not follow the catalogue folder pattern (e.g. `nis2-qnrcs`). */
 class InvalidFrameworkException(
     val framework: String,

@@ -13,20 +13,28 @@ data class AssessmentScope(
     val maxLevel: ComplianceLevel,
     val nis2Classification: Nis2Classification,
     val rulesVersion: String,
+    /** [nis2Classification] is the official CNCS qualification, not the indicative one. */
+    val nis2ClassificationOfficial: Boolean = false,
 )
 
 object ScopeRules {
     /**
      * In scope when the rules say YES or REVIEW, or when they do not judge the framework at all (e.g. soc-cmm).
-     * Only nis2-qnrcs is cut by the NIS2 classification; every other framework gets every level.
+     * Only nis2-qnrcs is cut by the NIS2 classification (the official one when registered, else the indicative one);
+     * every other framework gets every level.
      */
     fun resolve(framework: String, applicability: ApplicabilityResult): AssessmentScope {
         val entry = applicability.frameworks.firstOrNull { it.framework == framework }
-        if (entry?.applies == Applies.NO) throw FrameworkNotInScopeException(framework)
+        // The CNCS only qualifies covered entities: an official qualification puts NIS2 in scope.
+        val officiallyCovered = framework == ApplicabilityRules.NIS2 && applicability.officialNis2Classification != null
+        if (entry?.applies == Applies.NO && !officiallyCovered) throw FrameworkNotInScopeException(framework)
 
-        val maxLevel =
-            if (framework == ApplicabilityRules.NIS2) maxLevel(applicability.nis2Classification) else ComplianceLevel.HIGH
-        return AssessmentScope(framework, maxLevel, applicability.nis2Classification, applicability.rulesVersion)
+        val classification = applicability.effectiveNis2Classification
+        val maxLevel = if (framework == ApplicabilityRules.NIS2) maxLevel(classification) else ComplianceLevel.HIGH
+        return AssessmentScope(
+            framework, maxLevel, classification, applicability.rulesVersion,
+            nis2ClassificationOfficial = applicability.officialNis2Classification != null,
+        )
     }
 
     /**

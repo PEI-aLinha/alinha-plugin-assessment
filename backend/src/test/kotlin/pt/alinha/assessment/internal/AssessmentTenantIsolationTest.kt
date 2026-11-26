@@ -35,6 +35,7 @@ class AssessmentTenantIsolationTest {
 
     @Autowired private lateinit var mvc: MockMvc
     @Autowired private lateinit var jdbc: JdbcTemplate
+    @Autowired private lateinit var scopes: FakeApplicabilityQuery
 
     private lateinit var tenantA: UUID
     private lateinit var tenantB: UUID
@@ -50,6 +51,8 @@ class AssessmentTenantIsolationTest {
         tenantB = UUID.randomUUID()
         tokenA = "responsible.${UUID.randomUUID()}.$tenantA"
         tokenB = "responsible.${UUID.randomUUID()}.$tenantB"
+        scopes.declare(tenantA, IMPORTANT_SCOPE)
+        scopes.declare(tenantB, IMPORTANT_SCOPE)
         idA = JsonPath.read(start(tokenA).andExpect { status { isCreated() } }.andReturn().response.contentAsString, "$.id")
         answer(tokenA, idA, "yes").andExpect { status { isOk() } }
     }
@@ -57,7 +60,7 @@ class AssessmentTenantIsolationTest {
     private fun start(token: String): ResultActionsDsl = mvc.post(ASSESSMENTS) {
         header("Authorization", "Bearer $token")
         contentType = MediaType.APPLICATION_JSON
-        content = """{"framework": "nis2-qnrcs", "scope": $IMPORTANT_SCOPE}"""
+        content = """{"framework": "nis2-qnrcs"}"""
     }
 
     private fun answer(token: String, id: String, value: String): ResultActionsDsl =

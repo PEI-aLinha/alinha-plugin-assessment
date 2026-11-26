@@ -14,6 +14,7 @@ import pt.alinha.assessment.internal.FrameworkNotInScopeException
 import pt.alinha.assessment.internal.InvalidFrameworkException
 import pt.alinha.assessment.internal.InvalidPageException
 import pt.alinha.assessment.internal.QuestionNotInAssessmentException
+import pt.alinha.assessment.internal.ScopeNotAnsweredException
 import tools.jackson.core.JacksonException
 
 private const val VALIDATION_FAILED = "VALIDATION_FAILED"
@@ -27,8 +28,8 @@ private const val MAX_CAUSE_DEPTH = 20
 class AssessmentProblems {
 
     /**
-     * A body Jackson cannot read: malformed JSON, an unknown enum value, a missing field, or contradictory scope
-     * answers (the core's `require(...)` checks run while the body is read). Names the field when Jackson knows it.
+     * A body Jackson cannot read: malformed JSON, an unknown enum value or a missing field. Names the field when
+     * Jackson knows it.
      */
     @ExceptionHandler
     fun unreadable(e: HttpMessageNotReadableException): ProblemDetail {
@@ -52,6 +53,12 @@ class AssessmentProblems {
     fun notInScope(e: FrameworkNotInScopeException) = problem(
         HttpStatus.UNPROCESSABLE_CONTENT, "FRAMEWORK_NOT_IN_SCOPE",
         "Pelas respostas dadas, este regulamento não se aplica à sua organização.",
+    )
+
+    @ExceptionHandler
+    fun scopeNotAnswered(e: ScopeNotAnsweredException) = problem(
+        HttpStatus.CONFLICT, "SCOPE_NOT_ANSWERED",
+        "Antes de começar, responda às perguntas do âmbito regulatório, na página da organização.",
     )
 
     @ExceptionHandler

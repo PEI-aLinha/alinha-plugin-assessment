@@ -17,10 +17,10 @@ import pt.alinha.assessment.internal.persistence.AssessmentEntity
 import pt.alinha.assessment.internal.persistence.AssessmentRepository
 import pt.alinha.core.audit.AuditTrail
 import pt.alinha.core.compliance.Answer
-import pt.alinha.core.compliance.ApplicabilityInput
-import pt.alinha.core.compliance.ApplicabilityRules
+import pt.alinha.core.compliance.ApplicabilityQuery
 import pt.alinha.core.compliance.CatalogueRegistry
 import pt.alinha.core.compliance.ComplianceLevel
+import pt.alinha.core.tenant.TenantContext
 import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -46,7 +46,8 @@ class AssessmentService(
     private val assessments: AssessmentRepository,
     private val answers: AnswerRepository,
     private val catalogues: CatalogueRegistry,
-    private val applicability: ApplicabilityRules,
+    private val applicability: ApplicabilityQuery,
+    private val tenants: TenantContext,
     private val audit: AuditTrail,
     private val json: JsonMapper,
     transactionManager: PlatformTransactionManager,
@@ -58,13 +59,15 @@ class AssessmentService(
     }
 
     /**
-     * Starts a draft assessment of [framework] on its newest catalogue, cut to the scope the organization declared.
-     * The declared [scope] is stored as sent; the audit entry has the outcome only (no company figures).
+     * Starts a draft assessment of [framework] on its newest catalogue, cut to the scope the organization answered in
+     * the organization plugin (with the official CNCS qualification when registered). That applicability result is
+     * stored with the assessment; the audit entry has the outcome only (no company figures).
      */
     @Transactional
-    fun start(framework: String, scope: ApplicabilityInput): AssessmentDetail {
+    fun start(framework: String): AssessmentDetail {
         if (!FRAMEWORK_ID.matches(framework)) throw InvalidFrameworkException(framework)
-        val resolved = ScopeRules.resolve(framework, applicability.assess(scope))
+        val scope = applicability.current() ?: throw ScopeNotAnsweredException()
+        val resolved = ScopeRules.resolve(framework, scope)
         val catalogue = catalogues.latest(framework) ?: throw CatalogueNotFoundException(framework)
         openAssessment(framework)?.let { throw AssessmentAlreadyOpenException(it) }
 
@@ -74,6 +77,7 @@ class AssessmentService(
             catalogueVersion = catalogue.version,
             maxLevel = resolved.maxLevel,
             nis2Classification = resolved.nis2Classification,
+            nis2ClassificationOfficial = resolved.nis2ClassificationOfficial,
             rulesVersion = resolved.rulesVersion,
             scopeInput = json.writeValueAsString(scope),
             createdAt = now(),
@@ -93,6 +97,7 @@ class AssessmentService(
                 "catalogueVersion" to catalogue.version,
                 "maxLevel" to resolved.maxLevel.name,
                 "nis2Classification" to resolved.nis2Classification.name,
+                "nis2ClassificationOfficial" to resolved.nis2ClassificationOfficial,
                 "rulesVersion" to resolved.rulesVersion,
             ),
         )
@@ -213,6 +218,7 @@ class AssessmentService(
             catalogueTitle = questionnaire.catalogue.title,
             status = assessment.status.apiValue(),
             nis2Classification = assessment.nis2Classification.apiValue(),
+            nis2ClassificationOfficial = assessment.nis2ClassificationOfficial,
             maxLevel = assessment.maxLevel,
             rulesVersion = assessment.rulesVersion,
             progress = progress(saved.keys, questionnaire),

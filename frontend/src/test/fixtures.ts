@@ -35,6 +35,7 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
     updatedAt: '2026-11-22T10:00:00Z',
     catalogueTitle: 'NIS2 — Regime Jurídico da Cibersegurança',
     nis2Classification: 'important',
+    nis2ClassificationOfficial: false,
     maxLevel: 'substantial',
     rulesVersion: '2026.11.1',
     controls: [

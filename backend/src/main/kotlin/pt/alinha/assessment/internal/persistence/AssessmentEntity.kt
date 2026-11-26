@@ -27,9 +27,14 @@ class AssessmentEntity(
     @Enumerated(EnumType.STRING) @Column(name = "nis2_classification", updatable = false)
     val nis2Classification: Nis2Classification,
     @Column(name = "rules_version", updatable = false) val rulesVersion: String,
-    /** The ApplicabilityInput the organization declared on start, as JSON (self-declared; checked by the consultant). */
+    /**
+     * The organization's scope on start, as JSON: an ApplicabilityInput before core#25, the ApplicabilityResult read from
+     * the organization plugin since (self-declared answers; checked by the consultant).
+     */
     @JdbcTypeCode(SqlTypes.JSON) @Column(name = "scope_input", updatable = false) val scopeInput: String,
     @Column(name = "created_at", updatable = false) val createdAt: Instant,
+    /** [nis2Classification] is the official CNCS qualification, not the indicative one. */
+    @Column(name = "nis2_classification_official", updatable = false) val nis2ClassificationOfficial: Boolean = false,
 ) : TenantOwnedEntity() {
 
     @Enumerated(EnumType.STRING)

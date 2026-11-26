@@ -5,8 +5,6 @@ import { ASSESSMENTS_PATH, assessmentPath, type AssessmentPage as Page } from '.
 import { ASSESSMENT_ID, assessmentDetail, assessmentPage } from '../test/fixtures'
 import { BASE, renderAt } from '../test/renderWithHost'
 
-const PROFILE = { sector: 'industria', subsector: 'automoveis', employees: 120, turnover: 18500000 }
-
 /** A fake `api` that answers by path (and method), like the backend would. */
 function fakeApi(routes: Record<string, (init?: RequestInit) => unknown>) {
   return vi.fn(async (path: string, init?: RequestInit) => {
@@ -30,6 +28,7 @@ describe('AssessmentPage with an assessment', () => {
 
     expect(await screen.findByText('de 5 perguntas respondidas')).toBeInTheDocument()
     expect(screen.getByText('entidade importante')).toBeInTheDocument()
+    expect(screen.getByText(/Classificação NIS2 indicativa/)).toBeInTheDocument()
     expect(screen.getByText(/as perguntas vão até ao nível substancial/)).toBeInTheDocument()
     // Collapsed until asked for.
     expect(screen.queryByRole('list', { name: 'Secções da avaliação' })).not.toBeInTheDocument()
@@ -37,6 +36,16 @@ describe('AssessmentPage with an assessment', () => {
     const sections = within(screen.getByRole('list', { name: 'Secções da avaliação' })).getAllByRole('button')
     expect(sections.map((b) => b.textContent?.trim())).toEqual(['Governação 1/2', 'Identificar 0/2', 'Proteger 0/1'])
     expect(screen.getByText('3 secções · 5 perguntas')).toBeInTheDocument()
+  })
+
+  it('says when the classification is the official one from the CNCS', async () => {
+    const detail = assessmentDetail({ nis2Classification: 'essential', nis2ClassificationOfficial: true })
+    const api = fakeApi({ [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage(), [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => detail })
+    renderAt(BASE, { host: { api } })
+
+    expect(await screen.findByText(/Classificação NIS2 oficial \(CNCS\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/indicativa/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/A classificação oficial é feita pelo CNCS/)).not.toBeInTheDocument()
   })
 
   it('continues at the first unanswered question', async () => {
@@ -89,98 +98,42 @@ describe('AssessmentPage with no assessment yet', () => {
     expect(await screen.findByText('Ainda não há avaliação')).toBeInTheDocument()
   })
 
-  it('prefills the size from the registration and ticks the only activity of the sector', async () => {
-    const api = fakeApi({
-      [`GET ${ASSESSMENTS_PATH}`]: () => empty,
-      'GET /organization/profile': () => PROFILE,
-    })
-    renderAt(BASE, { host: { api } })
-
-    expect(await screen.findByLabelText('Número de trabalhadores')).toHaveValue('120')
-    expect((screen.getByLabelText('Volume de negócios anual (euros)') as HTMLInputElement).value).toMatch(/^18\s500\s000$/)
-    expect(screen.getByRole('checkbox', { name: 'Fabrico de veículos automóveis, reboques e componentes' })).toBeChecked()
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
-  })
-
-  it('shows every activity when asked', async () => {
-    const api = fakeApi({ [`GET ${ASSESSMENTS_PATH}`]: () => empty, 'GET /organization/profile': () => PROFILE })
-    renderAt(BASE, { host: { api } })
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Ver todas as atividades' }))
-
-    expect(screen.getByRole('checkbox', { name: 'Prestador de serviços de DNS' })).toBeInTheDocument()
-    expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(60)
-  })
-
-  it('starts with an empty form when the organization has no profile', async () => {
-    const api = fakeApi({
-      [`GET ${ASSESSMENTS_PATH}`]: () => empty,
-      'GET /organization/profile': () => { throw new ApiError(404, '/organization/profile', undefined, { code: 'ORGANIZATION_NOT_REGISTERED' }) },
-    })
-    renderAt(BASE, { host: { api } })
-
-    expect(await screen.findByLabelText('Número de trabalhadores')).toHaveValue('')
-    // No sector to suggest from: every activity is on the list already.
-    expect(screen.getByRole('checkbox', { name: 'Prestador de serviços de DNS' })).not.toBeChecked()
-    expect(screen.queryByRole('button', { name: 'Ver todas as atividades' })).not.toBeInTheDocument()
-  })
-
-  it('does not read the profile without permission to', async () => {
-    const api = fakeApi({ [`GET ${ASSESSMENTS_PATH}`]: () => empty })
-    renderAt(BASE, { host: { api, can: (resource) => resource !== 'organization' } })
-
-    expect(await screen.findByLabelText('Número de trabalhadores')).toHaveValue('')
-    expect(api).not.toHaveBeenCalledWith('/organization/profile', expect.anything())
-  })
-
-  it('asks for the missing answers before starting', async () => {
-    const api = fakeApi({ [`GET ${ASSESSMENTS_PATH}`]: () => empty, 'GET /organization/profile': () => PROFILE })
-    renderAt(BASE, { host: { api } })
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Começar a avaliação' }))
-
-    expect(screen.getAllByText('Escolha uma opção.')).toHaveLength(2)
-    expect(api).not.toHaveBeenCalledWith(ASSESSMENTS_PATH, expect.objectContaining({ method: 'POST' }))
-  })
-
-  it('starts the assessment with the scope and then shows it', async () => {
+  it('starts the assessment with the framework only and then shows it', async () => {
     let started = false
     const api = fakeApi({
       [`GET ${ASSESSMENTS_PATH}`]: () => (started ? assessmentPage() : empty),
-      'GET /organization/profile': () => PROFILE,
       [`POST ${ASSESSMENTS_PATH}`]: () => { started = true; return assessmentDetail({ progress: { answered: 0, total: 5 } }) },
       [`GET ${assessmentPath(ASSESSMENT_ID)}`]: () => assessmentDetail(),
     })
     renderAt(BASE, { host: { api } })
 
-    fireEvent.click(within(await screen.findByRole('group', { name: /dados pessoais/ })).getByLabelText('Sim'))
-    fireEvent.click(within(screen.getByRole('group', { name: /inteligência artificial/ })).getByLabelText('Não'))
-    fireEvent.click(screen.getByRole('button', { name: 'Começar a avaliação' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Começar a avaliação' }))
 
     expect(await screen.findByText('de 5 perguntas respondidas')).toBeInTheDocument()
     const post = api.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
-    expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({
-      framework: 'nis2-qnrcs',
-      scope: {
-        size: { employees: 120, annualTurnoverEur: 18500000 },
-        nis2: { entityTypes: ['MOTOR_VEHICLE_MANUFACTURING'] },
-        gdpr: { processesPersonalData: true },
-        aiAct: { usesAiSystems: false },
-      },
-    })
+    expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({ framework: 'nis2-qnrcs' })
   })
 
-  it('explains when NIS2 does not apply by the answers', async () => {
+  it('asks for the scope questions first when they are not answered', async () => {
     const api = fakeApi({
       [`GET ${ASSESSMENTS_PATH}`]: () => empty,
-      'GET /organization/profile': () => PROFILE,
+      [`POST ${ASSESSMENTS_PATH}`]: () => { throw new ApiError(409, ASSESSMENTS_PATH, undefined, { code: 'SCOPE_NOT_ANSWERED' }) },
+    })
+    renderAt(BASE, { host: { api } })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Começar a avaliação' }))
+
+    expect(await screen.findByText(/responda às perguntas do âmbito regulatório/)).toBeInTheDocument()
+  })
+
+  it('explains when NIS2 does not apply by the scope answers', async () => {
+    const api = fakeApi({
+      [`GET ${ASSESSMENTS_PATH}`]: () => empty,
       [`POST ${ASSESSMENTS_PATH}`]: () => { throw new ApiError(422, ASSESSMENTS_PATH, undefined, { code: 'FRAMEWORK_NOT_IN_SCOPE' }) },
     })
     renderAt(BASE, { host: { api } })
 
-    fireEvent.click(within(await screen.findByRole('group', { name: /dados pessoais/ })).getByLabelText('Não'))
-    fireEvent.click(within(screen.getByRole('group', { name: /inteligência artificial/ })).getByLabelText('Não'))
-    fireEvent.click(screen.getByRole('button', { name: 'Começar a avaliação' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Começar a avaliação' }))
 
     expect(await screen.findByText(/não está abrangida pelo regime de cibersegurança/)).toBeInTheDocument()
   })
@@ -189,7 +142,6 @@ describe('AssessmentPage with no assessment yet', () => {
     let listCalls = 0
     const api = fakeApi({
       [`GET ${ASSESSMENTS_PATH}`]: () => (++listCalls === 1 ? empty : assessmentPage()),
-      'GET /organization/profile': () => PROFILE,
       [`POST ${ASSESSMENTS_PATH}`]: () => {
         throw new ApiError(409, ASSESSMENTS_PATH, undefined, { code: 'ASSESSMENT_ALREADY_OPEN', detail: 'Já existe uma avaliação aberta.' })
       },
@@ -197,9 +149,7 @@ describe('AssessmentPage with no assessment yet', () => {
     })
     renderAt(BASE, { host: { api } })
 
-    fireEvent.click(within(await screen.findByRole('group', { name: /dados pessoais/ })).getByLabelText('Sim'))
-    fireEvent.click(within(screen.getByRole('group', { name: /inteligência artificial/ })).getByLabelText('Sim'))
-    fireEvent.click(screen.getByRole('button', { name: 'Começar a avaliação' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Começar a avaliação' }))
 
     expect(await screen.findByText('de 5 perguntas respondidas')).toBeInTheDocument()
   })

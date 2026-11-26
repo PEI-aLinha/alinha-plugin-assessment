@@ -68,8 +68,10 @@ function Overview({ assessment }: { assessment: AssessmentDetail }) {
         </p>
         <ProgressBar value={answered} max={total} label="Progresso da avaliação" />
         <p className="text-sm text-ink-soft">
-          Classificação NIS2 indicativa: <strong>{CLASSIFICATION_LABEL[assessment.nis2Classification]}</strong>. Por
-          isso, as perguntas vão até ao nível {LEVEL_LABEL[assessment.maxLevel]}. A classificação oficial é feita pelo CNCS.
+          {assessment.nis2ClassificationOfficial ? 'Classificação NIS2 oficial (CNCS)' : 'Classificação NIS2 indicativa'}:{' '}
+          <strong>{CLASSIFICATION_LABEL[assessment.nis2Classification]}</strong>. Por isso, as perguntas vão até ao
+          nível {LEVEL_LABEL[assessment.maxLevel]}.
+          {!assessment.nis2ClassificationOfficial && ' A classificação oficial é feita pelo CNCS.'}
         </p>
       </ProgressCard>
 

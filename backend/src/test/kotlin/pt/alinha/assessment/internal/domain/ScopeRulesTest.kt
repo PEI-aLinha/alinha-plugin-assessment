@@ -18,12 +18,14 @@ class ScopeRulesTest {
     private fun result(
         classification: Nis2Classification,
         vararg applies: Pair<String, Applies>,
+        official: Nis2Classification? = null,
     ) = ApplicabilityResult(
         rulesVersion = "r1",
         size = CompanySize.MEDIUM,
         nis2Classification = classification,
         cncsMayQualify = false,
         frameworks = applies.map { (framework, a) -> FrameworkApplicability(framework, a, emptyList()) },
+        officialNis2Classification = official,
     )
 
     @ParameterizedTest
@@ -77,5 +79,24 @@ class ScopeRulesTest {
     fun `a framework the rules do not judge is in scope`() {
         val scope = ScopeRules.resolve("soc-cmm", result(Nis2Classification.IMPORTANT))
         assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.HIGH)
+    }
+
+    @Test
+    fun `the official CNCS qualification wins over the indicative classification`() {
+        val scope = ScopeRules.resolve(
+            ApplicabilityRules.NIS2,
+            result(Nis2Classification.IMPORTANT, ApplicabilityRules.NIS2 to Applies.YES, official = Nis2Classification.ESSENTIAL),
+        )
+        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.HIGH)
+        assertThat(scope.nis2Classification).isEqualTo(Nis2Classification.ESSENTIAL)
+    }
+
+    @Test
+    fun `an official qualification puts nis2 in scope even when the rules say it does not apply`() {
+        val scope = ScopeRules.resolve(
+            ApplicabilityRules.NIS2,
+            result(Nis2Classification.NOT_COVERED, ApplicabilityRules.NIS2 to Applies.NO, official = Nis2Classification.IMPORTANT),
+        )
+        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.SUBSTANTIAL)
     }
 }
