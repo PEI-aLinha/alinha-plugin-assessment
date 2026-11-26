@@ -186,6 +186,50 @@ describe('QuestionPage', () => {
     expect(screen.getByRole('radio', { name: /^Sim/ })).not.toBeChecked()
   })
 
+  it('ignores a held key, so a held Enter does not skip question after question', async () => {
+    const fn = api()
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+
+    fireEvent.keyDown(document.body, { key: '1', repeat: true })
+    fireEvent.keyDown(document.body, { key: 'Enter', repeat: true })
+
+    expect(screen.getByRole('radio', { name: /^Sim/ })).not.toBeChecked()
+    expect(putCalls(fn)).toEqual([])
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+  })
+
+  it('ignores the keys while a dialog is open', async () => {
+    const fn = api()
+    const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Em parte/ })
+    const dialog = document.body.appendChild(document.createElement('div'))
+    dialog.setAttribute('role', 'dialog')
+
+    fireEvent.keyDown(document.body, { key: '1' })
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+
+    expect(screen.getByRole('radio', { name: /^Sim/ })).not.toBeChecked()
+    expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
+    dialog.remove()
+  })
+
+  it('only takes the digits of the options a question has', async () => {
+    const detail = assessmentDetail()
+    const [first] = detail.controls
+    const three = { ...first, questions: first.questions.map((q) => q.id === 'GR.CO-3-B-Q2' ? { ...q, options: ['yes', 'no', 'unknown'] as AnswerValue[] } : q) }
+    const fn = api({ ...detail, controls: [three, ...detail.controls.slice(1)] })
+    renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: fn } })
+    await screen.findByRole('radio', { name: /^Sim/ })
+    expect(screen.getByText(/Pelo teclado: 1 a 3 escolhem a resposta/)).toBeInTheDocument()
+
+    fireEvent.keyDown(document.body, { key: '4' })
+    expect(putCalls(fn)).toEqual([])
+
+    fireEvent.keyDown(document.body, { key: '3' })
+    await waitFor(() => expect(putCalls(fn)).toEqual([[answerPath(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), 'unknown']]))
+  })
+
   it('goes back to the saved answer when a save fails', async () => {
     const fn = api(assessmentDetail(), async () => { throw new ApiError(409, 'x', undefined, { code: 'ASSESSMENT_NOT_EDITABLE', detail: 'A avaliação já foi submetida.' }) })
     renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'), { host: { api: fn } })

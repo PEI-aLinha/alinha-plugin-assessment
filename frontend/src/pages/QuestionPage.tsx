@@ -188,14 +188,17 @@ function useHoldWhileSaving(state: SaveState) {
   }, [saving])
 }
 
-/** Keyboard shortcuts of the question page. Ignored with a modifier, while typing, and while a dialog is open. */
+/**
+ * Keyboard shortcuts of the question page. Ignored with a modifier, when a held key repeats (a held Enter would skip
+ * question after question), while typing, and while a dialog is open.
+ */
 function useAnswerKeys({ enabled, onDigit, onEnter }: { enabled: boolean; onDigit?: (n: number) => void; onEnter?: () => void }) {
   const handlers = useRef({ onDigit, onEnter })
   useLayoutEffect(() => { handlers.current = { onDigit, onEnter } })
   useEffect(() => {
     if (!enabled) return undefined
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
       const target = e.target instanceof HTMLElement ? e.target : null
       if (target?.closest('textarea, input:not([type="radio"]), select, [contenteditable="true"]')) return
       if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
