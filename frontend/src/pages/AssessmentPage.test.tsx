@@ -59,6 +59,16 @@ describe('AssessmentPage with an assessment', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe(`${BASE}/${ASSESSMENT_ID}/questions/PR.GA-3-B-Q1`))
   })
 
+  it('says how many questions a section has left', async () => {
+    const { router } = renderAt(BASE, { host: { api: api() } })
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Perguntas por secção/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Identificar/ }))
+    fireEvent.click(screen.getByRole('link', { name: 'Responder às 2 que faltam de Identificar' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`${BASE}/${ASSESSMENT_ID}/questions/ID.GA-1-B-Q1`))
+  })
+
   it('says when the assessment was submitted and only offers to see the answers', async () => {
     const submitted = fakeApi({
       [`GET ${ASSESSMENTS_PATH}`]: () => assessmentPage(),
