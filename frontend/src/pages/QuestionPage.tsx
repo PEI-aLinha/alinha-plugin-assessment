@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Check } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { errorMessage, formatDateTime, LOCALE, TIME_ZONE, useHost } from '@alinha/plugin-sdk'
 import { Badge, Button, Card, EmptyState, ErrorState, Eyebrow, PageHeader, RadioGroup, SkeletonRows, useToast } from '@alinha/ui'
 import type { AnswerValue, AssessmentDetail } from '../api'
@@ -44,7 +44,7 @@ export function QuestionPage() {
   return (
     <>
       {back}
-      <PageHeader eyebrow={`${detail.data.catalogueTitle} · ${step.section.name}`} title={`Pergunta ${index + 1} de ${questionnaire.total}`} />
+      <PageHeader title={`Pergunta ${index + 1} de ${questionnaire.total}`} subtitle={`${step.section.name} · ${detail.data.catalogueTitle}`} />
       <ProgressBar value={questionnaire.answered} max={questionnaire.total} label="Progresso da avaliação" />
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <QuestionCard key={step.question.id} assessment={detail.data} step={step} prev={prev} next={next} />
@@ -76,11 +76,11 @@ function QuestionCard({ assessment, step, prev, next }: { assessment: Assessment
       {editable ? <AnswerOptions assessmentId={assessment.id} step={step} saving={saving} onSavingChange={setSaving} /> : <ReadOnlyAnswer answer={question.answer} answeredAt={question.answeredAt} />}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="secondary" disabled={!prev || saving} onClick={() => prev && go(sibling(prev))}>← Anterior</Button>
+        <Button variant="secondary" disabled={!prev || saving} icon={<ArrowLeft className="size-4" aria-hidden />} onClick={() => prev && go(sibling(prev))}>Anterior</Button>
         <div className="flex flex-wrap justify-end gap-2">
           {editable && <Button variant="secondary" disabled={saving} onClick={() => go(OVERVIEW)}>Guardar e continuar depois</Button>}
           {/* After the last question, back to the overview of the sections. */}
-          <Button disabled={saving} onClick={() => go(next ? sibling(next) : OVERVIEW)}>{next ? 'Seguinte →' : 'Terminar'}</Button>
+          <Button disabled={saving} onClick={() => go(next ? sibling(next) : OVERVIEW)}>{next ? <>Seguinte<ArrowRight className="size-4" aria-hidden /></> : 'Terminar'}</Button>
         </div>
       </div>
     </Card>

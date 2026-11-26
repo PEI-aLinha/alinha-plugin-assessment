@@ -90,16 +90,16 @@ describe('QuestionPage', () => {
     fireEvent.click(await screen.findByRole('radio', { name: /^Não(?! sei)/ }))
     await waitFor(() => expect(putCalls(fn)).toHaveLength(1))
     fireEvent.click(screen.getByRole('radio', { name: /^Sim/ }))
-    for (const name of ['Seguinte →', '← Anterior', 'Guardar e continuar depois']) {
+    for (const name of ['Seguinte', 'Anterior', 'Guardar e continuar depois']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
-    fireEvent.click(screen.getByRole('button', { name: 'Seguinte →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Seguinte' }))
     expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'))
 
     await act(async () => { release() })
     await waitFor(() => expect(putCalls(fn).map(([, a]) => a)).toEqual(['no', 'yes']))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Seguinte →' })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: 'Seguinte →' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Seguinte' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Seguinte' }))
     await waitFor(() => expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'ID.GA-1-B-Q1')))
   })
 
@@ -116,10 +116,10 @@ describe('QuestionPage', () => {
   it('moves through every question in order, across sections, and ends at the overview', async () => {
     const { router } = renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2'), { host: { api: api() } })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Seguinte →' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Seguinte' }))
     await waitFor(() => expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'ID.GA-1-B-Q1')))
 
-    fireEvent.click(await screen.findByRole('button', { name: '← Anterior' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Anterior' }))
     await waitFor(() => expect(router.state.location.pathname).toBe(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q2')))
 
     await act(async () => { await router.navigate(questionUrl(ASSESSMENT_ID, 'PR.GA-3-B-Q1')) })
@@ -130,7 +130,7 @@ describe('QuestionPage', () => {
   it('has no previous question on the first one', async () => {
     renderAt(questionUrl(ASSESSMENT_ID, 'GR.CO-3-B-Q1'), { host: { api: api() } })
 
-    expect(await screen.findByRole('button', { name: '← Anterior' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Anterior' })).toBeDisabled()
   })
 
   it('"Guardar e continuar depois" goes back to the overview', async () => {
