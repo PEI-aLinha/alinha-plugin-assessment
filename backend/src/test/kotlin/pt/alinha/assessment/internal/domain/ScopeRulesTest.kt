@@ -10,7 +10,6 @@ import pt.alinha.core.compliance.ApplicabilityResult
 import pt.alinha.core.compliance.ApplicabilityRules
 import pt.alinha.core.compliance.Applies
 import pt.alinha.core.compliance.CompanySize
-import pt.alinha.core.compliance.ComplianceLevel
 import pt.alinha.core.compliance.FrameworkApplicability
 import pt.alinha.core.compliance.Nis2Classification
 
@@ -29,8 +28,8 @@ class ScopeRulesTest {
     )
 
     @ParameterizedTest
-    @CsvSource("ESSENTIAL,HIGH", "IMPORTANT,SUBSTANTIAL", "TO_BE_ASSESSED,HIGH", "NOT_COVERED,BASIC")
-    fun `nis2 classification sets the highest level asked`(c: Nis2Classification, level: ComplianceLevel) {
+    @CsvSource("ESSENTIAL,high", "IMPORTANT,substantial", "TO_BE_ASSESSED,high", "NOT_COVERED,basic")
+    fun `nis2 classification sets the highest level asked`(c: Nis2Classification, level: String) {
         assertThat(ScopeRules.maxLevel(c)).isEqualTo(level)
     }
 
@@ -41,7 +40,7 @@ class ScopeRulesTest {
             result(Nis2Classification.IMPORTANT, ApplicabilityRules.NIS2 to Applies.YES),
         )
         assertThat(scope).isEqualTo(
-            AssessmentScope("nis2-qnrcs", ComplianceLevel.SUBSTANTIAL, Nis2Classification.IMPORTANT, "r1"),
+            AssessmentScope("nis2-qnrcs", "substantial", Nis2Classification.IMPORTANT, "r1"),
         )
     }
 
@@ -51,7 +50,7 @@ class ScopeRulesTest {
             ApplicabilityRules.NIS2,
             result(Nis2Classification.NOT_COVERED, ApplicabilityRules.NIS2 to Applies.REVIEW),
         )
-        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.BASIC)
+        assertThat(scope.maxLevel).isEqualTo("basic")
     }
 
     @Test
@@ -67,18 +66,18 @@ class ScopeRulesTest {
     }
 
     @Test
-    fun `other frameworks get every level`() {
+    fun `other frameworks get every level of their scale`() {
         val scope = ScopeRules.resolve(
             ApplicabilityRules.GDPR,
             result(Nis2Classification.IMPORTANT, ApplicabilityRules.GDPR to Applies.YES),
         )
-        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.HIGH)
+        assertThat(scope.maxLevel).isNull()
     }
 
     @Test
     fun `a framework the rules do not judge is in scope`() {
         val scope = ScopeRules.resolve("soc-cmm", result(Nis2Classification.IMPORTANT))
-        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.HIGH)
+        assertThat(scope.maxLevel).isNull()
     }
 
     @Test
@@ -87,7 +86,7 @@ class ScopeRulesTest {
             ApplicabilityRules.NIS2,
             result(Nis2Classification.IMPORTANT, ApplicabilityRules.NIS2 to Applies.YES, official = Nis2Classification.ESSENTIAL),
         )
-        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.HIGH)
+        assertThat(scope.maxLevel).isEqualTo("high")
         assertThat(scope.nis2Classification).isEqualTo(Nis2Classification.ESSENTIAL)
     }
 
@@ -97,6 +96,6 @@ class ScopeRulesTest {
             ApplicabilityRules.NIS2,
             result(Nis2Classification.NOT_COVERED, ApplicabilityRules.NIS2 to Applies.NO, official = Nis2Classification.IMPORTANT),
         )
-        assertThat(scope.maxLevel).isEqualTo(ComplianceLevel.SUBSTANTIAL)
+        assertThat(scope.maxLevel).isEqualTo("substantial")
     }
 }

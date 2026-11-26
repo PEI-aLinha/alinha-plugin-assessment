@@ -16,6 +16,7 @@ const control = (id: string, title: string, technical: boolean, questions: Quest
   id,
   title,
   level: 'basic',
+  scaleLevel: { id: 'basic', label: 'Básico' },
   technical,
   questions,
 })
@@ -37,6 +38,7 @@ export function assessmentDetail(overrides: Partial<AssessmentDetail> = {}): Ass
     nis2Classification: 'important',
     nis2ClassificationOfficial: false,
     maxLevel: 'substantial',
+    maxScaleLevel: { id: 'substantial', label: 'Substancial' },
     rulesVersion: '2026.11.1',
     controls: [
       control('GR.CO-3-B', 'Requisitos legais conhecidos', false, [

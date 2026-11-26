@@ -1,16 +1,26 @@
 package pt.alinha.assessment.internal.domain
 
 import pt.alinha.core.compliance.Catalogue
-import pt.alinha.core.compliance.ComplianceLevel
 import pt.alinha.core.compliance.Control
+import pt.alinha.core.compliance.Level
 import pt.alinha.core.compliance.Question
 
-/** The questions of one assessment: the catalogue's controls up to [maxLevel], in catalogue order. */
+/**
+ * The questions of one assessment: the catalogue's controls up to [maxLevel] (a level id of the catalogue's own scale,
+ * compared by position), in catalogue order.
+ */
 class Questionnaire(
     val catalogue: Catalogue,
-    val maxLevel: ComplianceLevel,
+    val maxLevel: String,
 ) {
-    val controls: List<Control> = catalogue.controls.filter { it.level.ordinal <= maxLevel.ordinal }
+    private val maxIndex = catalogue.levelIndex(maxLevel).also {
+        require(it >= 0) { "Level '$maxLevel' is not in the scale of ${catalogue.framework} v${catalogue.version}" }
+    }
+
+    val controls: List<Control> = catalogue.controls.filter { catalogue.levelIndex(it.level) <= maxIndex }
+
+    /** The [maxLevel] with its label. */
+    val maxScaleLevel: Level = catalogue.levels[maxIndex]
 
     private val questionsById: Map<String, Question> = controls.flatMap { it.questions }.associateBy { it.id }
 

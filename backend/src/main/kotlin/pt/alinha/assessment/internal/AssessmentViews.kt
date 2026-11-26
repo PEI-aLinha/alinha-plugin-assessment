@@ -2,12 +2,17 @@ package pt.alinha.assessment.internal
 
 import pt.alinha.assessment.internal.domain.AssessmentStatus
 import pt.alinha.core.compliance.Answer
-import pt.alinha.core.compliance.ComplianceLevel
+import pt.alinha.core.compliance.Level
 import pt.alinha.core.compliance.Nis2Classification
 import java.time.Instant
 import java.util.UUID
 
 // Response bodies. Field names follow the OpenAPI schemas in contracts/openapi/alinha.yaml (assessment tag).
+
+/** The contract's `Level`: only what the screen shows, not the rest of the catalogue's level (e.g. evidence bars). */
+data class LevelView(val id: String, val label: String) {
+    constructor(level: Level) : this(level.id, level.label)
+}
 
 data class ProgressView(val answered: Int, val total: Int)
 
@@ -24,7 +29,9 @@ data class QuestionView(
 data class ControlView(
     val id: String,
     val title: String,
-    val level: ComplianceLevel,
+    /** Deprecated in the contract: the level id. [scaleLevel] has the label too (ADR 0007). */
+    val level: String,
+    val scaleLevel: LevelView,
     val technical: Boolean,
     val questions: List<QuestionView>,
 )
@@ -37,7 +44,9 @@ data class AssessmentDetail(
     val status: String,
     val nis2Classification: String,
     val nis2ClassificationOfficial: Boolean,
-    val maxLevel: ComplianceLevel,
+    /** Deprecated in the contract: the level id. [maxScaleLevel] has the label too (ADR 0007). */
+    val maxLevel: String,
+    val maxScaleLevel: LevelView,
     val rulesVersion: String,
     val progress: ProgressView,
     val createdAt: Instant,

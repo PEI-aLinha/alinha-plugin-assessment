@@ -6,7 +6,7 @@ import { Badge, Card, cn, EmptyState, ErrorState, Eyebrow, Note, PageHeader, Ske
 import { FRAMEWORK, type AssessmentDetail, type AssessmentStatus } from '../api'
 import { useAssessmentDetail, useAssessmentList } from '../assessmentQueries'
 import { ProgressBar } from '../components/ProgressBar'
-import { buildQuestionnaire, CLASSIFICATION_LABEL, LEVEL_LABEL, resumeStep, type Questionnaire } from '../questionnaire'
+import { buildQuestionnaire, CLASSIFICATION_LABEL, resumeStep, type Questionnaire } from '../questionnaire'
 import { StartAssessment } from './StartAssessment'
 
 const TITLE = 'Avaliação'
@@ -70,7 +70,7 @@ function Overview({ assessment }: { assessment: AssessmentDetail }) {
         <p className="text-sm text-ink-soft">
           {assessment.nis2ClassificationOfficial ? 'Classificação NIS2 oficial (CNCS)' : 'Classificação NIS2 indicativa'}:{' '}
           <strong>{CLASSIFICATION_LABEL[assessment.nis2Classification]}</strong>. Por isso, as perguntas vão até ao
-          nível {LEVEL_LABEL[assessment.maxLevel]}.
+          nível {assessment.maxScaleLevel.label.toLocaleLowerCase('pt-PT')}.
           {!assessment.nis2ClassificationOfficial && ' A classificação oficial é feita pelo CNCS.'}
         </p>
       </ProgressCard>

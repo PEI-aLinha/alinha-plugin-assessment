@@ -19,7 +19,6 @@ import pt.alinha.core.audit.AuditTrail
 import pt.alinha.core.compliance.Answer
 import pt.alinha.core.compliance.ApplicabilityQuery
 import pt.alinha.core.compliance.CatalogueRegistry
-import pt.alinha.core.compliance.ComplianceLevel
 import pt.alinha.core.tenant.TenantContext
 import tools.jackson.databind.json.JsonMapper
 import java.time.Instant
@@ -70,12 +69,16 @@ class AssessmentService(
         val resolved = ScopeRules.resolve(framework, scope)
         val catalogue = catalogues.latest(framework) ?: throw CatalogueNotFoundException(framework)
         openAssessment(framework)?.let { throw AssessmentAlreadyOpenException(it) }
+        val maxLevel = resolved.maxLevel ?: catalogue.levels.last().id
+        check(catalogue.levelIndex(maxLevel) >= 0) {
+            "Level '$maxLevel' is not in the scale of $framework v${catalogue.version}"
+        }
 
         val entity = AssessmentEntity(
             id = UUID.randomUUID(),
             framework = framework,
             catalogueVersion = catalogue.version,
-            maxLevel = resolved.maxLevel,
+            maxLevel = maxLevel,
             nis2Classification = resolved.nis2Classification,
             nis2ClassificationOfficial = resolved.nis2ClassificationOfficial,
             rulesVersion = resolved.rulesVersion,
@@ -95,7 +98,7 @@ class AssessmentService(
             mapOf(
                 "framework" to framework,
                 "catalogueVersion" to catalogue.version,
-                "maxLevel" to resolved.maxLevel.name,
+                "maxLevel" to maxLevel,
                 "nis2Classification" to resolved.nis2Classification.name,
                 "nis2ClassificationOfficial" to resolved.nis2ClassificationOfficial,
                 "rulesVersion" to resolved.rulesVersion,
@@ -128,7 +131,7 @@ class AssessmentService(
         val result = assessments.findAllBy(request)
         // One query for the answers of the whole page, and one questionnaire per catalogue version and level.
         val answered = answers.findAllByAssessmentIdIn(result.content.map { it.id }).groupBy({ it.assessmentId }, { it.questionId })
-        val questionnaires = mutableMapOf<Triple<String, Int, ComplianceLevel>, Questionnaire>()
+        val questionnaires = mutableMapOf<Triple<String, Int, String>, Questionnaire>()
         val items = result.content.map { assessment ->
             val questionnaire = questionnaires.getOrPut(
                 Triple(assessment.framework, assessment.catalogueVersion, assessment.maxLevel),
@@ -196,6 +199,9 @@ class AssessmentService(
                 id = control.id,
                 title = control.title,
                 level = control.level,
+                scaleLevel = LevelView(
+                    questionnaire.catalogue.levels[questionnaire.catalogue.levelIndex(control.level)],
+                ),
                 technical = control.technical,
                 questions = control.questions.map { question ->
                     val answer = saved[question.id]
@@ -220,6 +226,7 @@ class AssessmentService(
             nis2Classification = assessment.nis2Classification.apiValue(),
             nis2ClassificationOfficial = assessment.nis2ClassificationOfficial,
             maxLevel = assessment.maxLevel,
+            maxScaleLevel = LevelView(questionnaire.maxScaleLevel),
             rulesVersion = assessment.rulesVersion,
             progress = progress(saved.keys, questionnaire),
             createdAt = assessment.createdAt,
